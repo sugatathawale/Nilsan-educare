@@ -3,24 +3,27 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BarChart3,
+  BadgeCheck,
   BookOpen,
-  ClipboardList,
+  CreditCard,
   LayoutDashboard,
   LogOut,
+  PlayCircle,
   Users
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { isAdminLoggedIn, logoutAdmin } from "@/lib/admin-auth";
+import { fetchAdminSession, logoutAdmin } from "@/lib/admin-auth";
+import type { AdminUser } from "@/lib/admin-types";
 import { cx } from "@/lib/utils";
 
 const adminLinks = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Students", href: "/admin/students", icon: Users },
   { label: "Courses", href: "/admin/courses", icon: BookOpen },
-  { label: "Quizzes", href: "/admin/quizzes", icon: ClipboardList },
-  { label: "Analytics", href: "/admin/analytics", icon: BarChart3 }
+  { label: "Lessons", href: "/admin/lessons", icon: PlayCircle },
+  { label: "Payments", href: "/admin/payments", icon: CreditCard },
+  { label: "Enrollments", href: "/admin/enrollments", icon: BadgeCheck }
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -28,25 +31,37 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isLoginPage = pathname === "/admin/login";
   const [ready, setReady] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
-    const loggedIn = isAdminLoggedIn();
-    setAuthed(loggedIn);
-    setReady(true);
+    let active = true;
 
-    if (!loggedIn && !isLoginPage) {
-      router.replace("/admin/login");
+    async function boot() {
+      const session = await fetchAdminSession();
+      if (!active) return;
+
+      setUser(session);
+      setReady(true);
+
+      if (!session && !isLoginPage) {
+        router.replace("/admin/login");
+      }
+
+      if (session && isLoginPage) {
+        router.replace("/admin");
+      }
     }
 
-    if (loggedIn && isLoginPage) {
-      router.replace("/admin");
-    }
+    void boot();
+
+    return () => {
+      active = false;
+    };
   }, [isLoginPage, pathname, router]);
 
-  function handleLogout() {
-    logoutAdmin();
-    setAuthed(false);
+  async function handleLogout() {
+    await logoutAdmin();
+    setUser(null);
     router.replace("/admin/login");
   }
 
@@ -62,13 +77,20 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (!authed) {
+  if (!user) {
     return (
       <div className="admin-loading">
         <p>Redirecting to login...</p>
       </div>
     );
   }
+
+  const initials = user.fullName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="admin-shell">
@@ -107,8 +129,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <strong>Admin Panel</strong>
           </div>
           <div className="admin-topbar__actions">
-            <Link href="/dashboard">Student Dashboard</Link>
-            <span className="admin-avatar">A</span>
+            <Link href="/">View site</Link>
+            <div className="admin-user-chip">
+              <span className="admin-avatar">{initials}</span>
+              <div>
+                <strong>{user.fullName}</strong>
+                <small>{user.email}</small>
+              </div>
+            </div>
           </div>
         </header>
         {children}

@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum EnrollmentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  fullName     String
+  email        String       @unique
+  passwordHash String
+  role         UserRole     @default(STUDENT)
+  institution  String
+  academicYear String
+  classGrade   String
+  city         String?
+  state        String?
+  country      String       @default("India")
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  enrollments  Enrollment[]
+  payments     Payment[]
+
+  @@map("users")
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  title       String
+  description String?
+  pricePaise  Int
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  payments    Payment[]
+
+  @@map("courses")
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  userId    String
+  courseId  String
+  status    EnrollmentStatus @default(PENDING)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  courseId          String
+  razorpayOrderId   String        @unique
+  razorpayPaymentId String?       @unique
+  amountPaise       Int
+  status            PaymentStatus @default(CREATED)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course            Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model Lesson {
+  id        String   @id @default(cuid())
+  courseId  String
+  title     String
+  order     Int
+  videoUrl  String?
+  videoId   String?
+  duration  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, order])
+  @@map("lessons")
+}

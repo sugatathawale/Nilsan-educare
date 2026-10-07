@@ -8,6 +8,8 @@ out/
 # production
 build/
 dist/
+backend/dist/
+backend/node_modules/
 
 # debug
 npm-debug.log*
@@ -30,3 +32,4 @@ yarn-error.log*
 
 # turbo / cache
 .turbo
+.env*

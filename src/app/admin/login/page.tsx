@@ -3,24 +3,38 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { ADMIN_CREDENTIALS, loginAdmin } from "@/lib/admin-auth";
+import { loginAdmin } from "@/lib/admin-auth";
+import { ApiRequestError } from "@/lib/api";
+
+const DEMO_CREDENTIALS = {
+  email: "admin@nilsaneducare.com",
+  password: "admin123"
+};
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState(ADMIN_CREDENTIALS.email);
-  const [password, setPassword] = useState(ADMIN_CREDENTIALS.password);
+  const [email, setEmail] = useState(DEMO_CREDENTIALS.email);
+  const [password, setPassword] = useState(DEMO_CREDENTIALS.password);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const ok = loginAdmin(email, password);
+    setError("");
+    setLoading(true);
 
-    if (!ok) {
-      setError("Invalid email or password. Try the demo credentials below.");
-      return;
+    try {
+      await loginAdmin(email, password);
+      router.replace("/admin");
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.message
+          : "Unable to sign in. Check the API is running.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-
-    router.replace("/admin");
   }
 
   return (
@@ -30,7 +44,7 @@ export default function AdminLoginPage() {
         <div>
           <p className="admin-eyebrow">Admin Panel</p>
           <h1>Sign in</h1>
-          <p>Use the demo login to manage students, courses, and quizzes.</p>
+          <p>Manage students, courses, lessons, payments, and enrollments.</p>
         </div>
 
         <label>
@@ -38,6 +52,7 @@ export default function AdminLoginPage() {
           <input
             autoComplete="username"
             onChange={(event) => setEmail(event.target.value)}
+            required
             type="email"
             value={email}
           />
@@ -48,6 +63,7 @@ export default function AdminLoginPage() {
           <input
             autoComplete="current-password"
             onChange={(event) => setPassword(event.target.value)}
+            required
             type="password"
             value={password}
           />
@@ -55,14 +71,14 @@ export default function AdminLoginPage() {
 
         {error ? <p className="admin-login__error">{error}</p> : null}
 
-        <button className="admin-primary-action" type="submit">
-          Login to Admin
+        <button className="admin-primary-action" disabled={loading} type="submit">
+          {loading ? "Signing in..." : "Login to Admin"}
         </button>
 
         <div className="admin-login__hint">
           <strong>Demo credentials</strong>
-          <span>Email: {ADMIN_CREDENTIALS.email}</span>
-          <span>Password: {ADMIN_CREDENTIALS.password}</span>
+          <span>Email: {DEMO_CREDENTIALS.email}</span>
+          <span>Password: {DEMO_CREDENTIALS.password}</span>
         </div>
       </form>
     </div>

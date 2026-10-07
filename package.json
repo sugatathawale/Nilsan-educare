@@ -6,10 +6,14 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "next build --webpack",
+    "build:backend": "npm run build --prefix backend",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "start:backend": "npm run start --prefix backend",
+    "typecheck": "tsc --noEmit",
+    "typecheck:backend": "npm run typecheck --prefix backend"
   },
   "dependencies": {
     "lucide-react": "^1.21.0",

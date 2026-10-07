@@ -1,44 +1,105 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
-  BarChart3,
+  BadgeCheck,
   BookOpen,
-  ClipboardList,
-  Plus,
+  CreditCard,
+  PlayCircle,
   Users
 } from "lucide-react";
-import {
-  adminCourses,
-  adminMetrics,
-  adminTasks,
-  recentEnrollments
-} from "@/data/admin";
-
-const iconMap = {
-  Users,
-  BookOpen,
-  ClipboardList,
-  BarChart3
-};
+import { AdminStatus } from "@/components/admin/admin-status";
+import { apiRequest, formatDateTime, formatPaise } from "@/lib/api";
+import type { DashboardStats } from "@/lib/admin-types";
 
 export default function AdminPage() {
+  const [data, setData] = useState<DashboardStats | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      try {
+        const result = await apiRequest<DashboardStats>("/admin/dashboard");
+        if (active) setData(result);
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load dashboard");
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="admin-page">
+        <p className="admin-state">Loading overview...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="admin-page">
+        <p className="admin-state admin-state--error">{error || "No data"}</p>
+      </div>
+    );
+  }
+
+  const metrics = [
+    {
+      label: "Total Students",
+      value: String(data.stats.studentCount),
+      detail: "Registered student accounts",
+      icon: Users
+    },
+    {
+      label: "Active Courses",
+      value: String(data.stats.courseCount),
+      detail: "Published in the catalog",
+      icon: BookOpen
+    },
+    {
+      label: "Paid Enrollments",
+      value: String(data.stats.paidEnrollments),
+      detail: "Students with course access",
+      icon: BadgeCheck
+    },
+    {
+      label: "Recent Payments",
+      value: String(data.recentPayments.length),
+      detail: "Latest successful payments shown below",
+      icon: CreditCard
+    }
+  ];
+
   return (
     <div className="admin-page">
       <div className="admin-page__heading">
         <div>
           <p className="admin-eyebrow">Admin Panel</p>
           <h1>Dashboard Overview</h1>
-          <p>Manage students, courses, quizzes, and analytics in one place.</p>
+          <p>Live numbers from students, courses, enrollments, and payments.</p>
         </div>
-        <Link className="admin-primary-action" href="/admin/quizzes">
-          <Plus size={18} />
-          Create Quiz
+        <Link className="admin-primary-action" href="/admin/lessons">
+          <PlayCircle size={18} />
+          Manage Lessons
         </Link>
       </div>
 
       <section className="admin-metrics" aria-label="Admin metrics">
-        {adminMetrics.map((metric) => {
-          const Icon = iconMap[metric.icon as keyof typeof iconMap];
-
+        {metrics.map((metric) => {
+          const Icon = metric.icon;
           return (
             <article className="admin-metric-card" key={metric.label}>
               <div className="admin-metric-card__top">
@@ -47,7 +108,6 @@ export default function AdminPage() {
               </div>
               <strong>{metric.value}</strong>
               <div className="admin-metric-card__meta">
-                <b>{metric.delta}</b>
                 <span>{metric.detail}</span>
               </div>
             </article>
@@ -64,92 +124,59 @@ export default function AdminPage() {
           <BookOpen size={20} />
           Courses
         </Link>
-        <Link href="/admin/quizzes">
-          <ClipboardList size={20} />
-          Quizzes
+        <Link href="/admin/lessons">
+          <PlayCircle size={20} />
+          Lessons
         </Link>
-        <Link href="/admin/analytics">
-          <BarChart3 size={20} />
-          Analytics
+        <Link href="/admin/payments">
+          <CreditCard size={20} />
+          Payments
+        </Link>
+        <Link href="/admin/enrollments">
+          <BadgeCheck size={20} />
+          Enrollments
         </Link>
       </section>
 
       <section className="admin-grid">
-        <article className="admin-panel admin-panel--wide">
+        <article className="admin-panel admin-panel--full">
           <div className="admin-panel__header">
             <div>
-              <p className="admin-eyebrow">Courses</p>
-              <h2>Course Management</h2>
+              <p className="admin-eyebrow">Commerce</p>
+              <h2>Recent Payments</h2>
             </div>
-            <Link className="admin-secondary-action" href="/admin/courses">
+            <Link className="admin-secondary-action" href="/admin/payments">
               View All
             </Link>
           </div>
 
-          <div className="admin-course-list">
-            {adminCourses.map((course) => (
-              <div className="admin-course-row" key={course.title}>
-                <div>
-                  <strong>{course.title}</strong>
+          {data.recentPayments.length === 0 ? (
+            <p className="admin-empty">No paid transactions yet.</p>
+          ) : (
+            <div className="admin-table admin-table--payments" role="table">
+              <div className="admin-table__head" role="row">
+                <span>Student</span>
+                <span>Course</span>
+                <span>Amount</span>
+                <span>Date</span>
+                <span>Status</span>
+              </div>
+              {data.recentPayments.map((payment) => (
+                <div className="admin-table__row" role="row" key={payment.id}>
                   <span>
-                    {course.students} students • {course.quizzes} quizzes • Trainer:{" "}
-                    {course.trainer}
+                    <strong>{payment.user.fullName}</strong>
+                    <small>{payment.user.email}</small>
+                  </span>
+                  <span>{payment.course.title}</span>
+                  <span>{formatPaise(payment.amountPaise)}</span>
+                  <span>{formatDateTime(payment.createdAt)}</span>
+                  <span>
+                    <AdminStatus status={payment.status} />
                   </span>
                 </div>
-                <div className="admin-course-row__progress">
-                  <span>{course.completion}%</span>
-                  <div>
-                    <i style={{ width: `${course.completion}%` }} />
-                  </div>
-                </div>
-                <span className={`admin-status admin-status--${course.status.toLowerCase()}`}>
-                  {course.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="admin-panel">
-          <div className="admin-panel__header">
-            <div>
-              <p className="admin-eyebrow">Operations</p>
-              <h2>Today&apos;s Tasks</h2>
+              ))}
             </div>
-          </div>
-          <ul className="admin-task-list">
-            {adminTasks.map((task) => (
-              <li key={task}>{task}</li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="admin-panel admin-panel--wide">
-          <div className="admin-panel__header">
-            <div>
-              <p className="admin-eyebrow">Enrollments</p>
-              <h2>Recent Payments</h2>
-            </div>
-          </div>
-
-          <div className="admin-table" role="table" aria-label="Recent enrollments">
-            <div className="admin-table__head" role="row">
-              <span>Student</span>
-              <span>Course</span>
-              <span>Amount</span>
-              <span>Status</span>
-            </div>
-            {recentEnrollments.map((row) => (
-              <div className="admin-table__row" role="row" key={`${row.student}-${row.course}`}>
-                <span>{row.student}</span>
-                <span>{row.course}</span>
-                <span>{row.amount}</span>
-                <span className={`admin-status admin-status--${row.status.toLowerCase()}`}>
-                  {row.status}
-                </span>
-              </div>
-            ))}
-          </div>
+          )}
         </article>
       </section>
     </div>

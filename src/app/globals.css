@@ -1940,7 +1940,7 @@ img {
 
 .admin-quick-links {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -1990,17 +1990,27 @@ img {
 
 .admin-table--students .admin-table__head,
 .admin-table--students .admin-table__row {
-  grid-template-columns: 1.4fr 1.2fr 1fr 0.7fr 0.8fr;
+  grid-template-columns: 1.4fr 1.2fr 0.9fr 1.2fr 0.7fr;
 }
 
-.admin-table--quizzes .admin-table__head,
-.admin-table--quizzes .admin-table__row {
-  grid-template-columns: 1.4fr 1.2fr 0.7fr 0.7fr 0.7fr 0.7fr;
+.admin-table--payments .admin-table__head,
+.admin-table--payments .admin-table__row {
+  grid-template-columns: 1.3fr 1.2fr 0.7fr 1fr 0.7fr;
 }
 
-.admin-table--analytics .admin-table__head,
-.admin-table--analytics .admin-table__row {
-  grid-template-columns: 1.4fr 0.8fr 0.8fr 1fr;
+.admin-table--payments-full .admin-table__head,
+.admin-table--payments-full .admin-table__row {
+  grid-template-columns: 1.3fr 1.1fr 0.7fr 1.1fr 0.9fr 0.7fr;
+}
+
+.admin-table--enrollments .admin-table__head,
+.admin-table--enrollments .admin-table__row {
+  grid-template-columns: 1.4fr 1.3fr 0.8fr 1fr;
+}
+
+.admin-table--lessons .admin-table__head,
+.admin-table--lessons .admin-table__row {
+  grid-template-columns: 0.5fr 1.6fr 0.7fr 1fr 0.8fr;
 }
 
 .admin-table__row strong,
@@ -2445,9 +2455,151 @@ a.admin-primary-action {
   color: #c55c0c;
 }
 
-.admin-status--draft {
+.admin-status--draft,
+.admin-status--created,
+.admin-status--expired,
+.admin-status--cancelled {
   background: #eef0f4;
   color: #5f6673;
+}
+
+.admin-status--failed {
+  background: rgba(201, 68, 47, 0.12);
+  color: #c9442f;
+}
+
+.admin-state,
+.admin-empty {
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.admin-state--error {
+  border-style: solid;
+  border-color: rgba(201, 68, 47, 0.25);
+  background: rgba(201, 68, 47, 0.06);
+  color: #c9442f;
+}
+
+.admin-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-chip strong,
+.admin-user-chip small {
+  display: block;
+}
+
+.admin-user-chip small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-select-field {
+  display: grid;
+  gap: 8px;
+  min-width: min(320px, 100%);
+  font-weight: 700;
+}
+
+.admin-select-field select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--foreground);
+  padding: 12px 14px;
+}
+
+.admin-toolbar--filters {
+  flex-wrap: wrap;
+}
+
+.admin-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-filter {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #5f6673;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.admin-filter.is-active {
+  border-color: rgba(228, 81, 55, 0.35);
+  background: rgba(228, 81, 55, 0.12);
+  color: var(--primary);
+}
+
+.admin-stat-pill {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px 16px;
+  text-align: right;
+}
+
+.admin-stat-pill span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-stat-pill strong {
+  font-size: 22px;
+}
+
+.admin-danger-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(201, 68, 47, 0.25);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #c9442f;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.admin-danger-action:hover {
+  background: rgba(201, 68, 47, 0.06);
+}
+
+.admin-chip-row {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.admin-chip-row:last-child {
+  margin-bottom: 0;
+}
+
+.admin-course-card__desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.admin-panel--full {
+  grid-column: 1 / -1;
 }
 
 .admin-task-list {
@@ -2494,6 +2646,10 @@ a.admin-primary-action {
 }
 
 @media (max-width: 1180px) {
+  .admin-quick-links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .dashboard-hero__grid {
     min-height: 0;
     grid-template-columns: 1fr;
@@ -2527,7 +2683,6 @@ a.admin-primary-action {
   .stats-grid,
   .trainer-grid,
   .admin-metrics,
-  .admin-quick-links,
   .admin-course-cards,
   .about-section__grid,
   .course-details__grid,

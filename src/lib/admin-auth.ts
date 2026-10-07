@@ -1,27 +1,31 @@
-const AUTH_KEY = "nilsan_admin_auth";
+import { apiRequest } from "@/lib/api";
+import type { AdminUser } from "@/lib/admin-types";
 
-export const ADMIN_CREDENTIALS = {
-  email: "admin@nilsaneducare.com",
-  password: "admin123"
-};
-
-export function isAdminLoggedIn(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(AUTH_KEY) === "1";
-}
-
-export function loginAdmin(email: string, password: string): boolean {
-  const ok =
-    email.trim().toLowerCase() === ADMIN_CREDENTIALS.email &&
-    password === ADMIN_CREDENTIALS.password;
-
-  if (ok) {
-    window.localStorage.setItem(AUTH_KEY, "1");
+export async function fetchAdminSession(): Promise<AdminUser | null> {
+  try {
+    const data = await apiRequest<{ user: AdminUser }>("/auth/me");
+    if (data.user.role !== "ADMIN") return null;
+    return data.user;
+  } catch {
+    return null;
   }
-
-  return ok;
 }
 
-export function logoutAdmin() {
-  window.localStorage.removeItem(AUTH_KEY);
+export async function loginAdmin(
+  email: string,
+  password: string
+): Promise<AdminUser> {
+  const data = await apiRequest<{ user: AdminUser }>("/auth/admin/login", {
+    method: "POST",
+    body: { email, password }
+  });
+  return data.user;
+}
+
+export async function logoutAdmin(): Promise<void> {
+  try {
+    await apiRequest<null>("/auth/logout", { method: "POST" });
+  } catch {
+    // Clear local UI state even if the request fails
+  }
 }
