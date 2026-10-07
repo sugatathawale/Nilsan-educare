@@ -81,9 +81,15 @@ API base: **http://localhost:4000/api/v1**
 | GET | `/api/v1/enrollments/check/:slug` | User | Check enrollment |
 | POST | `/api/v1/payments/create-order` | User | Create Razorpay order |
 | POST | `/api/v1/payments/verify` | User | Verify payment |
+| GET | `/api/v1/lessons/video-config` | Admin | Bunny Stream config status |
+| POST | `/api/v1/lessons/videos` | Admin | Create Bunny video entry |
+| POST | `/api/v1/lessons/videos/:videoId/upload` | Admin | Upload video file to Bunny |
 | GET | `/api/v1/lessons/course/:slug` | User / Admin | Lessons (enrolled students or admin) |
-| POST | `/api/v1/lessons` | Admin | Add lesson + video link |
+| POST | `/api/v1/lessons` | Admin | Add lesson (+ videoId / embed URL) |
+| DELETE | `/api/v1/lessons/:id` | Admin | Delete lesson (+ Bunny video) |
 | GET | `/api/v1/admin/dashboard` | Admin | Admin stats |
+
+See root [`SETUP.md`](../SETUP.md) for Neon + Bunny Stream configuration steps.
 
 ## Signup body example
 

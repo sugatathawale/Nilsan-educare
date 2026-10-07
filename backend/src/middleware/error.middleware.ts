@@ -31,6 +31,17 @@ export const errorHandler = (
     return;
   }
 
+  // Multer upload errors (file too large, wrong type, etc.)
+  if (err.name === "MulterError") {
+    res.status(400).json(sendError(err.message));
+    return;
+  }
+
+  if (err.message === "Only video files are allowed") {
+    res.status(400).json(sendError(err.message));
+    return;
+  }
+
   console.error(err);
   res.status(500).json(sendError("Internal server error"));
 };

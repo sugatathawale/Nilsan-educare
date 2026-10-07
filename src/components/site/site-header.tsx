@@ -1,18 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, Sparkles, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useStudentAuth } from "@/components/auth/student-auth-provider";
 import { navLinks } from "@/data/dashboard";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { cx } from "@/lib/utils";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading, logout } = useStudentAuth();
   const mainLinks = navLinks.filter((link) => link.label !== "Admin Panel");
   const adminLink = navLinks.find((link) => link.label === "Admin Panel");
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   function isActive(href: string) {
     if (href.includes("#")) return false;
@@ -22,57 +38,162 @@ export function SiteHeader() {
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  async function handleLogout() {
+    await logout();
+    setOpen(false);
+    router.push("/login");
+  }
+
   return (
-    <header className="site-header">
-      <div className="site-container site-header__main-inner">
-        <BrandLogo href="/dashboard" />
+    <header className={cx("site-header", scrolled && "is-scrolled", open && "is-open")}>
+      <div className="site-header__glow" aria-hidden />
+      <div className="site-container site-header__shell">
+        <div className="site-header__main-inner">
+          <div className="site-header__brand">
+            <BrandLogo href="/dashboard" />
+            <span className="site-header__live">
+              <i />
+              Live 1-on-1
+            </span>
+          </div>
 
-        <nav className="site-header__nav" aria-label="Primary navigation">
-          {mainLinks.map((link) => (
-            <Link
-              className={cx(isActive(link.href) && "is-active")}
-              href={link.href}
-              key={link.label}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+          <nav className="site-header__nav" aria-label="Primary navigation">
+            {mainLinks.map((link) => (
+              <Link
+                className={cx("site-header__link", isActive(link.href) && "is-active")}
+                href={link.href}
+                key={link.label}
+              >
+                <span>{link.label}</span>
+              </Link>
+            ))}
+            {user ? (
+              <Link
+                className={cx(
+                  "site-header__link",
+                  isActive("/my-learning") && "is-active"
+                )}
+                href="/my-learning"
+              >
+                <span>My Learning</span>
+              </Link>
+            ) : null}
+          </nav>
 
-        {adminLink ? (
-          <Link className="site-header__admin desktop-only" href={adminLink.href}>
-            {adminLink.label}
-          </Link>
-        ) : null}
+          <div className="site-header__actions desktop-only">
+            {!loading && user ? (
+              <div className="site-header__session">
+                <span className="site-header__avatar">
+                  {user.fullName.charAt(0).toUpperCase()}
+                </span>
+                <div className="site-header__session-copy">
+                  <strong>{user.fullName.split(" ")[0]}</strong>
+                  <small>Student</small>
+                </div>
+                <button
+                  className="site-header__ghost"
+                  onClick={handleLogout}
+                  type="button"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : null}
 
-        <button
-          aria-expanded={open}
-          aria-label="Toggle navigation menu"
-          className="site-header__menu"
-          onClick={() => setOpen((value) => !value)}
-          type="button"
+            {!loading && !user && !isAuthPage ? (
+              <>
+                <Link className="site-header__ghost" href="/login">
+                  Log in
+                </Link>
+                <Link className="site-header__cta" href="/signup">
+                  <Sparkles size={16} />
+                  Start free
+                </Link>
+              </>
+            ) : null}
+
+            {adminLink ? (
+              <Link className="site-header__admin" href={adminLink.href}>
+                Admin
+              </Link>
+            ) : null}
+          </div>
+
+          <button
+            aria-expanded={open}
+            aria-label="Toggle navigation menu"
+            className="site-header__menu"
+            onClick={() => setOpen((value) => !value)}
+            type="button"
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+
+        <nav
+          className={cx("site-header__mobile", open && "is-open")}
+          aria-label="Mobile navigation"
         >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
-      </div>
+          <div className="site-header__mobile-panel">
+            {mainLinks.map((link, index) => (
+              <Link
+                className={cx(isActive(link.href) && "is-active")}
+                href={link.href}
+                key={link.label}
+                onClick={() => setOpen(false)}
+                style={{ animationDelay: `${index * 40}ms` }}
+              >
+                {link.label}
+              </Link>
+            ))}
 
-      {open ? (
-        <nav className="site-header__mobile" aria-label="Mobile navigation">
-          {navLinks.map((link) => (
-            <Link
-              className={cx(
-                isActive(link.href) && "is-active",
-                link.label === "Admin Panel" && "is-admin"
+            {user ? (
+              <Link
+                className={cx(isActive("/my-learning") && "is-active")}
+                href="/my-learning"
+                onClick={() => setOpen(false)}
+              >
+                My Learning
+              </Link>
+            ) : null}
+
+            <div className="site-header__mobile-actions">
+              {!user ? (
+                <>
+                  <Link href="/login" onClick={() => setOpen(false)}>
+                    Log in
+                  </Link>
+                  <Link
+                    className="is-cta"
+                    href="/signup"
+                    onClick={() => setOpen(false)}
+                  >
+                    Start free
+                  </Link>
+                </>
+              ) : (
+                <button
+                  className="site-header__mobile-logout"
+                  onClick={handleLogout}
+                  type="button"
+                >
+                  Logout
+                </button>
               )}
-              href={link.href}
-              key={link.label}
-              onClick={() => setOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
+
+              {adminLink ? (
+                <Link
+                  className="is-admin"
+                  href={adminLink.href}
+                  onClick={() => setOpen(false)}
+                >
+                  {adminLink.label}
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </nav>
-      ) : null}
+      </div>
     </header>
   );
 }

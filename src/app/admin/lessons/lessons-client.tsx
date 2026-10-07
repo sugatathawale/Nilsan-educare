@@ -2,9 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
-import { apiRequest, ApiRequestError } from "@/lib/api";
-import type { CourseSummary, LessonItem } from "@/lib/admin-types";
+import { Plus, Trash2, Upload } from "lucide-react";
+import { apiRequest, apiUpload, ApiRequestError } from "@/lib/api";
+import type {
+  BunnyVideoConfig,
+  CourseSummary,
+  LessonItem
+} from "@/lib/admin-types";
 
 export default function AdminLessonsClient() {
   const searchParams = useSearchParams();
@@ -13,26 +17,32 @@ export default function AdminLessonsClient() {
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [courseSlug, setCourseSlug] = useState(presetCourse);
   const [lessons, setLessons] = useState<LessonItem[]>([]);
+  const [bunny, setBunny] = useState<BunnyVideoConfig | null>(null);
   const [showForm, setShowForm] = useState(Boolean(presetCourse));
   const [title, setTitle] = useState("");
   const [order, setOrder] = useState("1");
   const [duration, setDuration] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [videoId, setVideoId] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [manualVideoId, setManualVideoId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
 
   useEffect(() => {
     let active = true;
 
     async function loadCourses() {
       try {
-        const data = await apiRequest<{ courses: CourseSummary[] }>("/courses");
+        const [coursesData, bunnyData] = await Promise.all([
+          apiRequest<{ courses: CourseSummary[] }>("/courses"),
+          apiRequest<BunnyVideoConfig>("/lessons/video-config")
+        ]);
         if (!active) return;
-        setCourses(data.courses);
-        setCourseSlug((current) => current || data.courses[0]?.slug || "");
+        setCourses(coursesData.courses);
+        setBunny(bunnyData);
+        setCourseSlug((current) => current || coursesData.courses[0]?.slug || "");
       } catch (err) {
         if (active) {
           setError(err instanceof Error ? err.message : "Failed to load courses");
@@ -87,8 +97,43 @@ export default function AdminLessonsClient() {
     setMessage("");
     setError("");
     setSaving(true);
+    setUploadProgress("");
 
     try {
+      let videoId = manualVideoId.trim() || undefined;
+      let videoUrl: string | undefined;
+
+      if (videoFile) {
+        if (!bunny?.configured) {
+          throw new Error(
+            "Bunny Stream is not configured. Add keys in backend/.env first."
+          );
+        }
+
+        setUploadProgress("Creating Bunny video entry...");
+        const created = await apiRequest<{
+          videoId: string;
+          embedUrl: string;
+        }>("/lessons/videos", {
+          method: "POST",
+          body: { title: title.trim() }
+        });
+
+        videoId = created.videoId;
+        videoUrl = created.embedUrl;
+
+        setUploadProgress("Uploading video file to Bunny Stream...");
+        const formData = new FormData();
+        formData.append("video", videoFile);
+        const uploaded = await apiUpload<{
+          videoId: string;
+          embedUrl: string;
+        }>(`/lessons/videos/${videoId}/upload`, formData);
+
+        videoUrl = uploaded.embedUrl;
+        setUploadProgress("Saving lesson...");
+      }
+
       const payload: Record<string, string | number> = {
         courseSlug,
         title: title.trim(),
@@ -96,8 +141,8 @@ export default function AdminLessonsClient() {
       };
 
       if (duration.trim()) payload.duration = duration.trim();
-      if (videoUrl.trim()) payload.videoUrl = videoUrl.trim();
-      if (videoId.trim()) payload.videoId = videoId.trim();
+      if (videoId) payload.videoId = videoId;
+      if (videoUrl) payload.videoUrl = videoUrl;
 
       await apiRequest<{ lesson: LessonItem }>("/lessons", {
         method: "POST",
@@ -110,13 +155,19 @@ export default function AdminLessonsClient() {
       setLessons(data.lessons);
       setTitle("");
       setDuration("");
-      setVideoUrl("");
-      setVideoId("");
+      setVideoFile(null);
+      setManualVideoId("");
       setShowForm(false);
-      setMessage("Lesson created successfully.");
+      setUploadProgress("");
+      setMessage(
+        videoFile
+          ? "Lesson saved. Bunny may take a few minutes to finish encoding the video."
+          : "Lesson created successfully."
+      );
     } catch (err) {
+      setUploadProgress("");
       setError(
-        err instanceof ApiRequestError
+        err instanceof ApiRequestError || err instanceof Error
           ? err.message
           : "Failed to create lesson"
       );
@@ -126,7 +177,9 @@ export default function AdminLessonsClient() {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this lesson?")) return;
+    if (!window.confirm("Delete this lesson and its Bunny video (if any)?")) {
+      return;
+    }
 
     setMessage("");
     setError("");
@@ -150,7 +203,7 @@ export default function AdminLessonsClient() {
         <div>
           <p className="admin-eyebrow">Lessons</p>
           <h1>Lesson Management</h1>
-          <p>Add video lessons to a course and keep the syllabus in order.</p>
+          <p>Upload videos to Bunny Stream and attach them to courses.</p>
         </div>
         <button
           className="admin-primary-action"
@@ -165,6 +218,23 @@ export default function AdminLessonsClient() {
           <Plus size={18} />
           {showForm ? "Close form" : "Add Lesson"}
         </button>
+      </div>
+
+      <div
+        className={
+          bunny?.configured
+            ? "admin-config-banner is-ok"
+            : "admin-config-banner is-warn"
+        }
+      >
+        <strong>Bunny Stream</strong>
+        <span>
+          {bunny?.configured
+            ? `Connected · Library ${bunny.libraryId}${
+                bunny.cdnHostname ? ` · CDN ${bunny.cdnHostname}` : ""
+              }`
+            : "Not configured — set BUNNY_STREAM_* keys in backend/.env (see SETUP.md)"}
+        </span>
       </div>
 
       <div className="admin-toolbar">
@@ -225,25 +295,36 @@ export default function AdminLessonsClient() {
               />
             </label>
             <label>
-              Video ID
+              Existing Bunny video ID (optional)
               <input
-                onChange={(event) => setVideoId(event.target.value)}
-                placeholder="Bunny / provider video id"
+                onChange={(event) => setManualVideoId(event.target.value)}
+                placeholder="Only if video already exists in Bunny"
                 type="text"
-                value={videoId}
+                value={manualVideoId}
               />
             </label>
           </div>
 
-          <label>
-            Video URL
+          <label className="admin-file-field">
+            <span>
+              <Upload size={18} />
+              Upload lecture video
+            </span>
             <input
-              onChange={(event) => setVideoUrl(event.target.value)}
-              placeholder="https://..."
-              type="url"
-              value={videoUrl}
+              accept="video/*"
+              onChange={(event) => setVideoFile(event.target.files?.[0] || null)}
+              type="file"
             />
+            <small>
+              {videoFile
+                ? `${videoFile.name} (${Math.round(videoFile.size / (1024 * 1024))} MB)`
+                : "MP4 / MOV up to 500 MB. Stored on Bunny Stream, not in Neon."}
+            </small>
           </label>
+
+          {uploadProgress ? (
+            <p className="admin-flash">{uploadProgress}</p>
+          ) : null}
 
           <div className="admin-form__actions">
             <button
@@ -281,12 +362,19 @@ export default function AdminLessonsClient() {
               </span>
               <span>{lesson.duration || "—"}</span>
               <span>
-                {lesson.videoUrl || lesson.videoId ? (
-                  <small>
-                    {lesson.videoId ? `ID: ${lesson.videoId}` : null}
-                    {lesson.videoId && lesson.videoUrl ? " · " : null}
-                    {lesson.videoUrl ? "URL set" : null}
-                  </small>
+                {lesson.videoId || lesson.embedUrl || lesson.videoUrl ? (
+                  <span className="admin-video-cell">
+                    {lesson.videoId ? <small>ID: {lesson.videoId}</small> : null}
+                    {lesson.embedUrl || lesson.videoUrl ? (
+                      <a
+                        href={lesson.embedUrl || lesson.videoUrl || undefined}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open player
+                      </a>
+                    ) : null}
+                  </span>
                 ) : (
                   <small>No video</small>
                 )}

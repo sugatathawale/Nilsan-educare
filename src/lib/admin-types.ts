@@ -1,16 +1,6 @@
-export type AdminUser = {
-  id: string;
-  fullName: string;
-  email: string;
-  role: "STUDENT" | "ADMIN";
-  institution: string;
-  academicYear: string;
-  classGrade: string;
-  city: string | null;
-  state: string | null;
-  country: string;
-  createdAt: string;
-};
+import type { AppUser } from "@/lib/auth-types";
+
+export type AdminUser = AppUser;
 
 export type AdminStudent = {
   id: string;
@@ -48,6 +38,14 @@ export type LessonItem = {
   duration: string | null;
   videoUrl: string | null;
   videoId: string | null;
+  embedUrl?: string | null;
+  playbackUrl?: string | null;
+};
+
+export type BunnyVideoConfig = {
+  configured: boolean;
+  libraryId: string | null;
+  cdnHostname: string | null;
 };
 
 export type EnrollmentStatus = "PENDING" | "PAID" | "EXPIRED" | "CANCELLED";

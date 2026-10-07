@@ -63,6 +63,33 @@ export async function apiRequest<T>(
   return payload.data;
 }
 
+/** Multipart upload (video files). Do not set Content-Type — browser sets boundary. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    body: formData
+  });
+
+  let payload: ApiSuccess<T> | ApiError | null = null;
+
+  try {
+    payload = (await response.json()) as ApiSuccess<T> | ApiError;
+  } catch {
+    throw new ApiRequestError("Unexpected server response", response.status);
+  }
+
+  if (!response.ok || !payload.success) {
+    throw new ApiRequestError(
+      payload.message || "Upload failed",
+      response.status,
+      payload.success ? undefined : payload.errors
+    );
+  }
+
+  return payload.data;
+}
+
 export function formatPaise(amountPaise: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
