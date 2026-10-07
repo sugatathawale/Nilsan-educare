@@ -2,6 +2,19 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
   "http://localhost:4000/api/v1";
 
+export const API_ORIGIN =
+  process.env.NEXT_PUBLIC_API_ORIGIN?.replace(/\/$/, "") ||
+  API_BASE.replace(/\/api\/v1\/?$/, "") ||
+  "http://localhost:4000";
+
+export function mediaUrl(pathOrUrl: string | null | undefined): string {
+  if (!pathOrUrl) return "";
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+    return pathOrUrl;
+  }
+  return `${API_ORIGIN}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+}
+
 export type ApiSuccess<T> = {
   success: true;
   message: string;

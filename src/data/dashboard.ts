@@ -6,9 +6,16 @@ export const contact = {
 export const navLinks = [
   { label: "Home", href: "/dashboard" },
   { label: "Our Courses", href: "/dashboard#courses" },
+  { label: "Gallery", href: "/gallery" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
   { label: "Admin Panel", href: "/admin" }
+];
+
+export const galleryNavLinks = [
+  { label: "Events", href: "/gallery/events" },
+  { label: "Results", href: "/gallery/results" },
+  { label: "Classroom", href: "/gallery/classroom" }
 ];
 
 export const teacherProfile = {

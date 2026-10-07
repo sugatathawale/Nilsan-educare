@@ -6,6 +6,8 @@ import {
   BadgeCheck,
   BookOpen,
   CreditCard,
+  Headphones,
+  Images,
   LayoutDashboard,
   LogOut,
   PlayCircle,
@@ -22,6 +24,8 @@ const adminLinks = [
   { label: "Students", href: "/admin/students", icon: Users },
   { label: "Courses", href: "/admin/courses", icon: BookOpen },
   { label: "Lessons", href: "/admin/lessons", icon: PlayCircle },
+  { label: "Library", href: "/admin/library", icon: Headphones },
+  { label: "Gallery", href: "/admin/gallery", icon: Images },
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
   { label: "Enrollments", href: "/admin/enrollments", icon: BadgeCheck }
 ];

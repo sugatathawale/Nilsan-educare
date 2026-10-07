@@ -31,6 +31,13 @@ export type CourseSummary = {
   _count: { lessons: number };
 };
 
+export type LessonNote = {
+  id: string;
+  title: string;
+  fileUrl: string;
+  createdAt: string;
+};
+
 export type LessonItem = {
   id: string;
   title: string;
@@ -40,6 +47,7 @@ export type LessonItem = {
   videoId: string | null;
   embedUrl?: string | null;
   playbackUrl?: string | null;
+  notes?: LessonNote[];
 };
 
 export type BunnyVideoConfig = {

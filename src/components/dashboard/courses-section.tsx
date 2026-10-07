@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, Clock, Sparkles, Star, Users } from "lucide-react";
+import { ArrowRight, Check, Clock, MonitorPlay, Star } from "lucide-react";
 import { featuredCourse } from "@/data/dashboard";
 
 export function CoursesSection() {
@@ -8,70 +8,87 @@ export function CoursesSection() {
     <section className="courses-section" id="courses">
       <div className="site-container">
         <div className="courses-section__heading">
-          <p className="section-eyebrow">Learn With Us</p>
-          <h2>Our Course</h2>
+          <div>
+            <p className="section-eyebrow">Our Courses</p>
+            <h2>One focused program. Real speaking results.</h2>
+          </div>
           <p>
-            One focused program. One clear goal. Speak English confidently with live personal coaching.
+            Live 1-on-1 coaching built for students, job seekers, and professionals who want
+            confidence — not textbook English.
           </p>
         </div>
 
-        <article className="course-spotlight">
-          <div className="course-spotlight__media">
+        <article className="course-card-featured">
+          <div className="course-card-featured__media">
             <Image
               alt={featuredCourse.title}
-              height={520}
+              fill
+              sizes="(max-width: 900px) 100vw, 46vw"
               src={featuredCourse.image}
-              width={720}
             />
-            <span className="course-spotlight__badge">{featuredCourse.badge}</span>
+            <span className="course-card-featured__badge">{featuredCourse.badge}</span>
           </div>
 
-          <div className="course-spotlight__content">
-            <p className="course-spotlight__eyebrow">
-              <Sparkles size={16} />
-              Flagship English Program
-            </p>
-            <h3>{featuredCourse.title}</h3>
-            <p className="course-spotlight__tagline">{featuredCourse.tagline}</p>
-            <p>{featuredCourse.shortDescription}</p>
+          <div className="course-card-featured__body">
+            <div className="course-card-featured__top">
+              <h3>{featuredCourse.title}</h3>
+              <p>{featuredCourse.tagline}</p>
+            </div>
 
-            <ul className="course-spotlight__highlights">
+            <div className="course-card-featured__stats">
+              {featuredCourse.stats.map((stat) => (
+                <div key={stat.label}>
+                  <strong>{stat.value}</strong>
+                  <span>{stat.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <ul className="course-card-featured__list">
               {featuredCourse.highlights.map((item) => (
                 <li key={item}>
-                  <Check size={18} />
+                  <Check size={16} strokeWidth={2.5} />
                   {item}
                 </li>
               ))}
             </ul>
 
-            <div className="course-spotlight__meta">
+            <div className="course-card-featured__meta">
               <span>
-                <Clock size={16} />
+                <Clock size={15} />
                 {featuredCourse.duration}
               </span>
               <span>
-                <Star size={16} />
+                <Star size={15} />
                 {featuredCourse.level}
               </span>
               <span>
-                <Users size={16} />
-                1-on-1 Live Classes
+                <MonitorPlay size={15} />
+                {featuredCourse.mode}
               </span>
             </div>
 
-            <div className="course-spotlight__footer">
-              <div>
+            <div className="course-card-featured__footer">
+              <div className="course-card-featured__price">
                 <strong>{featuredCourse.price}</strong>
                 <span>{featuredCourse.originalPrice}</span>
-                <small>Limited-time launch offer</small>
+                <small>Limited-time offer</small>
               </div>
-              <Link
-                className="course-spotlight__cta"
-                href={`/courses/${featuredCourse.slug}`}
-              >
-                View Details
-                <ArrowRight size={18} />
-              </Link>
+              <div className="course-card-featured__actions">
+                <Link
+                  className="course-card-featured__cta"
+                  href={`/courses/${featuredCourse.slug}`}
+                >
+                  View course
+                  <ArrowRight size={17} />
+                </Link>
+                <Link
+                  className="course-card-featured__ghost"
+                  href="/contact"
+                >
+                  Ask a question
+                </Link>
+              </div>
             </div>
           </div>
         </article>

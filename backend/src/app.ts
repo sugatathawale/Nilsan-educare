@@ -1,3 +1,4 @@
+import path from "node:path";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -10,12 +11,24 @@ import { apiRouter } from "./routes/index.js";
 export const createApp = () => {
   const app = express();
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" }
+    })
+  );
   app.use(cors(corsOptions));
-  // JSON stays small; video uploads use multipart on /lessons/videos/:id/upload
+  // JSON stays small; video/image uploads use multipart routes
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
+
+  app.use(
+    "/uploads",
+    express.static(path.resolve(process.cwd(), "uploads"), {
+      maxAge: "7d",
+      fallthrough: true
+    })
+  );
 
   app.get("/", (_req, res) => {
     res.json({

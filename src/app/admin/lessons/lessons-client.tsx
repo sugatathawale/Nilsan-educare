@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Trash2, Upload } from "lucide-react";
-import { apiRequest, apiUpload, ApiRequestError } from "@/lib/api";
+import { FileText, Plus, Trash2, Upload } from "lucide-react";
+import { apiRequest, apiUpload, mediaUrl, ApiRequestError } from "@/lib/api";
 import type {
   BunnyVideoConfig,
   CourseSummary,
@@ -29,6 +29,9 @@ export default function AdminLessonsClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [noteLessonId, setNoteLessonId] = useState<string | null>(null);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteFile, setNoteFile] = useState<File | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -197,6 +200,60 @@ export default function AdminLessonsClient() {
     }
   }
 
+  async function handleNoteUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!noteLessonId || !noteFile) {
+      setError("Choose a lesson note file.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", noteFile);
+      if (noteTitle.trim()) formData.append("title", noteTitle.trim());
+      await apiUpload(`/lessons/${noteLessonId}/notes`, formData);
+
+      const data = await apiRequest<{ lessons: LessonItem[] }>(
+        `/lessons/course/${courseSlug}`
+      );
+      setLessons(data.lessons);
+      setNoteFile(null);
+      setNoteTitle("");
+      setNoteLessonId(null);
+      setMessage("Lecture note uploaded.");
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError || err instanceof Error
+          ? err.message
+          : "Failed to upload note"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteNote(noteId: string) {
+    if (!window.confirm("Delete this lecture note?")) return;
+    try {
+      await apiRequest<null>(`/lessons/notes/${noteId}`, { method: "DELETE" });
+      setLessons((prev) =>
+        prev.map((lesson) => ({
+          ...lesson,
+          notes: (lesson.notes || []).filter((note) => note.id !== noteId)
+        }))
+      );
+      setMessage("Lecture note deleted.");
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError ? err.message : "Failed to delete note"
+      );
+    }
+  }
+
   return (
     <div className="admin-page">
       <div className="admin-page__heading">
@@ -346,50 +403,99 @@ export default function AdminLessonsClient() {
       ) : null}
 
       {lessons.length > 0 ? (
-        <div className="admin-table admin-table--lessons" role="table">
-          <div className="admin-table__head" role="row">
-            <span>Order</span>
-            <span>Title</span>
-            <span>Duration</span>
-            <span>Video</span>
-            <span>Actions</span>
-          </div>
+        <div className="admin-lesson-stack">
           {lessons.map((lesson) => (
-            <div className="admin-table__row" role="row" key={lesson.id}>
-              <span>{lesson.order}</span>
-              <span>
-                <strong>{lesson.title}</strong>
-              </span>
-              <span>{lesson.duration || "—"}</span>
-              <span>
-                {lesson.videoId || lesson.embedUrl || lesson.videoUrl ? (
-                  <span className="admin-video-cell">
-                    {lesson.videoId ? <small>ID: {lesson.videoId}</small> : null}
-                    {lesson.embedUrl || lesson.videoUrl ? (
-                      <a
-                        href={lesson.embedUrl || lesson.videoUrl || undefined}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Open player
-                      </a>
-                    ) : null}
+            <article className="admin-lesson-card" key={lesson.id}>
+              <div className="admin-lesson-card__top">
+                <div>
+                  <small>Lesson {lesson.order}</small>
+                  <strong>{lesson.title}</strong>
+                  <span>
+                    {lesson.duration || "No duration"} ·{" "}
+                    {lesson.videoId || lesson.videoUrl ? "Video ready" : "No video"}
                   </span>
-                ) : (
-                  <small>No video</small>
-                )}
-              </span>
-              <span>
-                <button
-                  className="admin-danger-action"
-                  onClick={() => void handleDelete(lesson.id)}
-                  type="button"
-                >
-                  <Trash2 size={16} />
-                  Delete
-                </button>
-              </span>
-            </div>
+                </div>
+                <div className="admin-lesson-card__actions">
+                  {lesson.embedUrl || lesson.videoUrl ? (
+                    <a
+                      className="admin-secondary-action"
+                      href={lesson.embedUrl || lesson.videoUrl || undefined}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Open player
+                    </a>
+                  ) : null}
+                  <button
+                    className="admin-secondary-action"
+                    onClick={() =>
+                      setNoteLessonId((current) =>
+                        current === lesson.id ? null : lesson.id
+                      )
+                    }
+                    type="button"
+                  >
+                    <FileText size={16} />
+                    Add note
+                  </button>
+                  <button
+                    className="admin-danger-action"
+                    onClick={() => void handleDelete(lesson.id)}
+                    type="button"
+                  >
+                    <Trash2 size={16} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              {(lesson.notes || []).length > 0 ? (
+                <ul className="admin-note-list">
+                  {(lesson.notes || []).map((note) => (
+                    <li key={note.id}>
+                      <a href={mediaUrl(note.fileUrl)} rel="noreferrer" target="_blank">
+                        {note.title}
+                      </a>
+                      <button
+                        className="admin-danger-action"
+                        onClick={() => void handleDeleteNote(note.id)}
+                        type="button"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="admin-note-empty">No lecture notes yet.</p>
+              )}
+
+              {noteLessonId === lesson.id ? (
+                <form className="admin-note-form" onSubmit={handleNoteUpload}>
+                  <input
+                    onChange={(event) => setNoteTitle(event.target.value)}
+                    placeholder="Note title (optional)"
+                    type="text"
+                    value={noteTitle}
+                  />
+                  <input
+                    accept=".pdf,.doc,.docx,application/pdf,image/*"
+                    onChange={(event) =>
+                      setNoteFile(event.target.files?.[0] || null)
+                    }
+                    required
+                    type="file"
+                  />
+                  <button
+                    className="admin-primary-action"
+                    disabled={saving}
+                    type="submit"
+                  >
+                    Upload note
+                  </button>
+                </form>
+              ) : null}
+            </article>
           ))}
         </div>
       ) : null}

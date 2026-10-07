@@ -6,6 +6,8 @@ import { enrollmentsRouter } from "../modules/enrollments/enrollments.routes.js"
 import { paymentsRouter } from "../modules/payments/payments.routes.js";
 import { lessonsRouter } from "../modules/lessons/lessons.routes.js";
 import { adminRouter } from "../modules/admin/admin.routes.js";
+import { galleryRouter } from "../modules/gallery/gallery.routes.js";
+import { libraryRouter } from "../modules/library/library.routes.js";
 
 export const apiRouter = Router();
 
@@ -23,4 +25,6 @@ apiRouter.use("/courses", coursesRouter);
 apiRouter.use("/enrollments", enrollmentsRouter);
 apiRouter.use("/payments", paymentsRouter);
 apiRouter.use("/lessons", lessonsRouter);
+apiRouter.use("/gallery", galleryRouter);
+apiRouter.use("/library", libraryRouter);
 apiRouter.use("/admin", adminRouter);

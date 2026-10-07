@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
 import {
   createBunnyVideo,
@@ -11,6 +13,8 @@ import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../middleware/error.middleware.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { getParam } from "../../utils/request.js";
+
+const notesUploadsRoot = path.resolve(process.cwd(), "uploads", "notes");
 
 const withPlayback = <
   T extends {
@@ -135,7 +139,16 @@ export const getCourseLessons = async (
         order: true,
         duration: true,
         videoUrl: true,
-        videoId: true
+        videoId: true,
+        notes: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            fileUrl: true,
+            createdAt: true
+          }
+        }
       }
     });
 
@@ -208,6 +221,60 @@ export const deleteLesson = async (
     }
 
     res.json(sendSuccess(null, "Lesson deleted"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addLessonNote = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const lessonId = getParam(req.params.id);
+    const file = req.file;
+    if (!file) throw new AppError("Note file is required", 400);
+
+    const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) throw new AppError("Lesson not found", 404);
+
+    const title =
+      (typeof req.body.title === "string" && req.body.title.trim()) ||
+      file.originalname;
+
+    const note = await prisma.lessonNote.create({
+      data: {
+        lessonId,
+        title,
+        fileUrl: `/uploads/notes/${file.filename}`
+      }
+    });
+
+    res.status(201).json(sendSuccess({ note }, "Lecture note uploaded"));
+  } catch (error) {
+    if (req.file) await fs.unlink(req.file.path).catch(() => undefined);
+    next(error);
+  }
+};
+
+export const deleteLessonNote = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = getParam(req.params.noteId);
+    const note = await prisma.lessonNote.findUnique({ where: { id } });
+    if (!note) throw new AppError("Lecture note not found", 404);
+
+    await prisma.lessonNote.delete({ where: { id } });
+    const filename = path.basename(note.fileUrl);
+    await fs
+      .unlink(path.join(notesUploadsRoot, filename))
+      .catch(() => undefined);
+
+    res.json(sendSuccess(null, "Lecture note deleted"));
   } catch (error) {
     next(error);
   }

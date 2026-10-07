@@ -25,24 +25,43 @@ enum PaymentStatus {
   FAILED
 }
 
+enum GalleryCategory {
+  EVENTS
+  RESULTS
+  CLASSROOM
+}
+
+enum ResourceType {
+  NOTE
+  AUDIOBOOK
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
 model User {
-  id           String       @id @default(cuid())
-  fullName     String
-  email        String       @unique
-  passwordHash String
-  role         UserRole     @default(STUDENT)
-  institution  String
-  academicYear String
-  classGrade   String
-  city         String?
-  state        String?
-  country      String       @default("India")
-  latitude     Float?
-  longitude    Float?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  enrollments  Enrollment[]
-  payments     Payment[]
+  id                    String                 @id @default(cuid())
+  fullName              String
+  email                 String                 @unique
+  passwordHash          String
+  role                  UserRole               @default(STUDENT)
+  institution           String
+  academicYear          String
+  classGrade            String
+  city                  String?
+  state                 String?
+  country               String                 @default("India")
+  latitude              Float?
+  longitude             Float?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  enrollments           Enrollment[]
+  payments              Payment[]
+  librarySubscriptions  LibrarySubscription[]
 
   @@map("users")
 }
@@ -94,17 +113,88 @@ model Payment {
 }
 
 model Lesson {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   courseId  String
   title     String
   order     Int
   videoUrl  String?
   videoId   String?
   duration  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  course    Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  notes     LessonNote[]
 
   @@unique([courseId, order])
   @@map("lessons")
+}
+
+model LessonNote {
+  id        String   @id @default(cuid())
+  lessonId  String
+  title     String
+  fileUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@map("lesson_notes")
+}
+
+model GalleryImage {
+  id        String          @id @default(cuid())
+  category  GalleryCategory
+  title     String?
+  imageUrl  String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([category, createdAt])
+  @@map("gallery_images")
+}
+
+model LibraryPlan {
+  id          String   @id @default("default")
+  title       String   @default("Notes & Audiobook Access")
+  description String?
+  pricePaise  Int      @default(49900)
+  freeLimit   Int      @default(5)
+  updatedAt   DateTime @updatedAt
+
+  @@map("library_plans")
+}
+
+model LibraryResource {
+  id          String       @id @default(cuid())
+  type        ResourceType
+  title       String
+  description String?
+  fileUrl     String
+  coverUrl    String?
+  isFree      Boolean      @default(false)
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([type, isActive, sortOrder])
+  @@map("library_resources")
+}
+
+model LibrarySubscription {
+  id                String             @id @default(cuid())
+  userId            String
+  status            SubscriptionStatus @default(PENDING)
+  amountPaise       Int
+  razorpayOrderId   String?            @unique
+  razorpayPaymentId String?            @unique
+  startsAt          DateTime?
+  endsAt            DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("library_subscriptions")
 }

@@ -35,3 +35,7 @@ yarn-error.log*
 
 # turbo / cache
 .turbo
+
+# uploaded gallery images
+backend/uploads/
+!backend/uploads/.gitkeep

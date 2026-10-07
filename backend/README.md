@@ -87,6 +87,15 @@ API base: **http://localhost:4000/api/v1**
 | GET | `/api/v1/lessons/course/:slug` | User / Admin | Lessons (enrolled students or admin) |
 | POST | `/api/v1/lessons` | Admin | Add lesson (+ videoId / embed URL) |
 | DELETE | `/api/v1/lessons/:id` | Admin | Delete lesson (+ Bunny video) |
+| GET | `/api/v1/gallery` | — | List gallery images (`?category=RESULTS`) |
+| POST | `/api/v1/gallery` | Admin | Upload gallery image (multipart) |
+| DELETE | `/api/v1/gallery/:id` | Admin | Delete gallery image |
+| GET | `/api/v1/library` | Optional user | Notes & audiobooks (locked if premium) |
+| PUT | `/api/v1/library/plan` | Admin | Update subscription price / free limit |
+| POST | `/api/v1/library/resources` | Admin | Upload note or audiobook |
+| POST | `/api/v1/library/subscribe` | User | Subscribe to full library |
+| POST | `/api/v1/lessons/:id/notes` | Admin | Upload lecture note for a lesson |
+| DELETE | `/api/v1/lessons/notes/:noteId` | Admin | Delete lecture note |
 | GET | `/api/v1/admin/dashboard` | Admin | Admin stats |
 
 See root [`SETUP.md`](../SETUP.md) for Neon + Bunny Stream configuration steps.
