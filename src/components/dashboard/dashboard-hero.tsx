@@ -13,26 +13,41 @@ export function DashboardHero() {
 
   return (
     <section className="dashboard-hero">
+      <div className="dashboard-hero__atmosphere" aria-hidden>
+        <span className="dashboard-hero__glow dashboard-hero__glow--a" />
+        <span className="dashboard-hero__glow dashboard-hero__glow--b" />
+        <span className="dashboard-hero__glow dashboard-hero__glow--c" />
+        <span className="dashboard-hero__orb" />
+      </div>
+
       <div className="site-container dashboard-hero__grid">
         <div className="dashboard-hero__copy">
+          <p className="dashboard-hero__eyebrow">Nilsan Educare</p>
           <h1>
             <span className="dashboard-hero__title-line">
               {user ? "Welcome back," : "Welcome,"}
             </span>
             <span className="dashboard-hero__title-accent">
-              {loading ? "..." : `${firstName}!`}
+              {loading ? "Student" : firstName}
             </span>
           </h1>
-          <p>
+          <p className="dashboard-hero__lead dashboard-hero__lead--full">
             {user
               ? "Continue your English learning journey with personalized 1-on-1 classes."
-              : "Create an account to enroll in courses and start speaking with confidence."}
+              : "Browse courses and free resources anytime. Log in or create an account only when you are ready to pay."}
+          </p>
+          <p className="dashboard-hero__lead dashboard-hero__lead--short">
+            {user
+              ? "Continue with personalized 1-on-1 English classes."
+              : "Browse free. Log in only when you’re ready to enroll."}
           </p>
 
-          <ul>
+          <ul className="dashboard-hero__features">
             {heroFeatures.map((feature) => (
               <li key={feature}>
-                <Check size={34} />
+                <span className="dashboard-hero__check" aria-hidden>
+                  <Check size={14} strokeWidth={3} />
+                </span>
                 {feature}
               </li>
             ))}
@@ -59,12 +74,13 @@ export function DashboardHero() {
         </div>
 
         <div className="dashboard-hero__visual">
+          <div className="dashboard-hero__visual-glow" aria-hidden />
           <Image
-            alt="Teacher"
+            alt="Nilesh Sir, English trainer"
             className="dashboard-hero__teacher"
             height={1024}
             priority
-            sizes="(max-width: 900px) 90vw, 520px"
+            sizes="(max-width: 900px) 70vw, (max-width: 1180px) 380px, 520px"
             src="/images/nilesteacher.png"
             width={1536}
           />

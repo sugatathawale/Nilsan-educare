@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
@@ -334,6 +335,69 @@ export const subscribe = async (
           keyId: env.RAZORPAY_KEY_ID
         },
         "Subscription order created"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifySubscribe = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!isRazorpayConfigured) {
+      throw new AppError("Payment gateway is not configured", 503);
+    }
+
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body as {
+      razorpayOrderId?: string;
+      razorpayPaymentId?: string;
+      razorpaySignature?: string;
+    };
+
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      throw new AppError("Payment verification details are required", 400);
+    }
+
+    const body = `${razorpayOrderId}|${razorpayPaymentId}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", env.RAZORPAY_KEY_SECRET!)
+      .update(body)
+      .digest("hex");
+
+    if (expectedSignature !== razorpaySignature) {
+      throw new AppError("Invalid payment signature", 400);
+    }
+
+    const subscription = await prisma.librarySubscription.findUnique({
+      where: { razorpayOrderId }
+    });
+
+    if (!subscription || subscription.userId !== req.user!.userId) {
+      throw new AppError("Subscription order not found", 404);
+    }
+
+    if (subscription.status === "ACTIVE") {
+      res.json(sendSuccess({ subscribed: true, alreadyPaid: true }, "Already subscribed"));
+      return;
+    }
+
+    const updated = await prisma.librarySubscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: "ACTIVE",
+        razorpayPaymentId,
+        startsAt: new Date()
+      }
+    });
+
+    res.json(
+      sendSuccess(
+        { subscribed: true, alreadyPaid: false, subscription: updated },
+        "Library subscription activated"
       )
     );
   } catch (error) {

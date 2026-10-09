@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, Menu, Sparkles, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
 import { galleryNavLinks, navLinks } from "@/data/dashboard";
@@ -22,7 +22,7 @@ export function SiteHeader() {
   const galleryActive = pathname.startsWith("/gallery");
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
+    const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -49,15 +49,10 @@ export function SiteHeader() {
 
   return (
     <header className={cx("site-header", scrolled && "is-scrolled", open && "is-open")}>
-      <div className="site-header__glow" aria-hidden />
       <div className="site-container site-header__shell">
         <div className="site-header__main-inner">
           <div className="site-header__brand">
-            <BrandLogo href="/dashboard" />
-            <span className="site-header__live">
-              <i />
-              Live 1-on-1
-            </span>
+            <BrandLogo compact href="/dashboard" />
           </div>
 
           <nav className="site-header__nav" aria-label="Primary navigation">
@@ -80,8 +75,8 @@ export function SiteHeader() {
                       )}
                       href="/gallery"
                     >
-                      <span>Gallery</span>
-                      <ChevronDown size={15} />
+                      Gallery
+                      <ChevronDown size={14} />
                     </Link>
                     <div
                       className={cx(
@@ -118,7 +113,7 @@ export function SiteHeader() {
                   href={link.href}
                   key={link.label}
                 >
-                  <span>{link.label}</span>
+                  {link.label}
                 </Link>
               );
             })}
@@ -131,7 +126,7 @@ export function SiteHeader() {
                 )}
                 href="/my-learning"
               >
-                <span>My Learning</span>
+                My Learning
               </Link>
             ) : null}
           </nav>
@@ -142,16 +137,15 @@ export function SiteHeader() {
                 <span className="site-header__avatar">
                   {user.fullName.charAt(0).toUpperCase()}
                 </span>
-                <div className="site-header__session-copy">
-                  <strong>{user.fullName.split(" ")[0]}</strong>
-                  <small>Student</small>
-                </div>
+                <span className="site-header__session-name">
+                  {user.fullName.split(" ")[0]}
+                </span>
                 <button
                   className="site-header__ghost"
                   onClick={handleLogout}
                   type="button"
                 >
-                  Logout
+                  Log out
                 </button>
               </div>
             ) : null}
@@ -162,8 +156,7 @@ export function SiteHeader() {
                   Log in
                 </Link>
                 <Link className="site-header__cta" href="/signup">
-                  <Sparkles size={16} />
-                  Start free
+                  Get started
                 </Link>
               </>
             ) : null}
@@ -182,7 +175,7 @@ export function SiteHeader() {
             onClick={() => setOpen((value) => !value)}
             type="button"
           >
-            {open ? <X size={22} /> : <Menu size={22} />}
+            {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
@@ -191,7 +184,7 @@ export function SiteHeader() {
           aria-label="Mobile navigation"
         >
           <div className="site-header__mobile-panel">
-            {mainLinks.map((link, index) => (
+            {mainLinks.map((link) => (
               <Link
                 className={cx(
                   (link.label === "Gallery"
@@ -201,13 +194,12 @@ export function SiteHeader() {
                 href={link.href}
                 key={link.label}
                 onClick={() => setOpen(false)}
-                style={{ animationDelay: `${index * 40}ms` }}
               >
                 {link.label}
               </Link>
             ))}
 
-            <p className="site-header__mobile-label">Gallery sections</p>
+            <p className="site-header__mobile-label">Gallery</p>
             {galleryNavLinks.map((link) => (
               <Link
                 className={cx(isActive(link.href) && "is-active")}
@@ -240,7 +232,7 @@ export function SiteHeader() {
                     href="/signup"
                     onClick={() => setOpen(false)}
                   >
-                    Start free
+                    Get started
                   </Link>
                 </>
               ) : (
@@ -249,17 +241,13 @@ export function SiteHeader() {
                   onClick={handleLogout}
                   type="button"
                 >
-                  Logout
+                  Log out
                 </button>
               )}
 
               {adminLink ? (
-                <Link
-                  className="is-admin"
-                  href={adminLink.href}
-                  onClick={() => setOpen(false)}
-                >
-                  {adminLink.label}
+                <Link href={adminLink.href} onClick={() => setOpen(false)}>
+                  Admin
                 </Link>
               ) : null}
             </div>

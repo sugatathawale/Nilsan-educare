@@ -67,17 +67,25 @@ model User {
 }
 
 model Course {
-  id          String       @id @default(cuid())
-  slug        String       @unique
-  title       String
-  description String?
-  pricePaise  Int
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  lessons     Lesson[]
-  enrollments Enrollment[]
-  payments    Payment[]
+  id                 String       @id @default(cuid())
+  slug               String       @unique
+  title              String
+  tagline            String?
+  description        String?
+  badge              String?
+  duration           String?
+  level              String?
+  mode               String?
+  classLength        String?
+  imageUrl           String?
+  pricePaise         Int
+  originalPricePaise Int?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  lessons            Lesson[]
+  enrollments        Enrollment[]
+  payments           Payment[]
 
   @@map("courses")
 }

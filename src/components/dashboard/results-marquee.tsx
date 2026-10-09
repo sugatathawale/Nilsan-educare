@@ -24,7 +24,11 @@ export function ResultsMarquee() {
   return (
     <section className="results-marquee" aria-label="Our Result">
       <div className="site-container">
-        <h2 className="results-marquee__title">Our Result</h2>
+        <div className="results-marquee__heading">
+          <span className="results-marquee__rule results-marquee__rule--left" aria-hidden />
+          <h2 className="results-marquee__title">Our Result</h2>
+          <span className="results-marquee__rule results-marquee__rule--right" aria-hidden />
+        </div>
       </div>
 
       <div className="results-marquee__viewport">

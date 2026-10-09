@@ -91,3 +91,9 @@ libraryRouter.post(
   authenticate,
   libraryController.subscribe
 );
+
+libraryRouter.post(
+  "/subscribe/verify",
+  authenticate,
+  libraryController.verifySubscribe
+);

@@ -76,10 +76,14 @@ export async function apiRequest<T>(
   return payload.data;
 }
 
-/** Multipart upload (video files). Do not set Content-Type — browser sets boundary. */
-export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+/** Multipart upload. Do not set Content-Type — browser sets boundary. */
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  method: "POST" | "PATCH" | "PUT" = "POST"
+): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
+    method,
     credentials: "include",
     body: formData
   });

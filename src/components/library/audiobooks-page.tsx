@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Headphones, Lock, Unlock } from "lucide-react";
+import { Headphones, Lock, Unlock } from "lucide-react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
 import {
+  ApiRequestError,
   apiRequest,
   formatPaise,
-  mediaUrl,
-  ApiRequestError
+  mediaUrl
 } from "@/lib/api";
 import {
   buildAuthHref,
@@ -24,11 +24,10 @@ import {
 } from "@/lib/razorpay-checkout";
 import { cx } from "@/lib/utils";
 
-function LibrarySectionInner() {
+function AudiobooksPageInner() {
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useStudentAuth();
   const [data, setData] = useState<LibraryPayload | null>(null);
-  const [tab, setTab] = useState<"NOTE" | "AUDIOBOOK">("NOTE");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -42,7 +41,7 @@ function LibrarySectionInner() {
       const payload = await apiRequest<LibraryPayload>("/library");
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load library");
+      setError(err instanceof Error ? err.message : "Failed to load audiobooks");
     } finally {
       setLoading(false);
     }
@@ -52,17 +51,17 @@ function LibrarySectionInner() {
     void load();
   }, [user?.id]);
 
-  const items = useMemo(() => {
+  const audiobooks = useMemo(() => {
     if (!data) return [];
-    return data.resources.filter((item) => item.type === tab);
-  }, [data, tab]);
+    return data.resources.filter((item) => item.type === "AUDIOBOOK");
+  }, [data]);
 
   async function handleSubscribe() {
     if (authLoading) return;
 
     const redirected = requireAuthForCheckout({
       isLoggedIn: Boolean(user),
-      nextPath: "/dashboard?checkout=library#library",
+      nextPath: "/audiobooks?checkout=library",
       intent: { type: "library" },
       preferSignup: true
     });
@@ -76,7 +75,7 @@ function LibrarySectionInner() {
 
       if ("demo" in result && result.demo) {
         clearCheckoutIntent();
-        setMessage("Subscription activated. Enjoy all notes and audiobooks.");
+        setMessage("Subscription activated. Enjoy all audiobooks.");
         await load();
         return;
       }
@@ -91,7 +90,7 @@ function LibrarySectionInner() {
 
       await verifyLibraryPayment(payment);
       clearCheckoutIntent();
-      setMessage("Payment successful. Premium library unlocked.");
+      setMessage("Payment successful. Premium audiobooks unlocked.");
       await load();
     } catch (err) {
       if (err instanceof Error && err.message === "Payment cancelled") {
@@ -127,22 +126,21 @@ function LibrarySectionInner() {
     }
     requireAuthForCheckout({
       isLoggedIn: false,
-      nextPath: "/dashboard?checkout=library#library",
+      nextPath: "/audiobooks?checkout=library",
       intent: { type: "library" },
       preferSignup: true
     });
   }
 
   function ResourceCard({ item }: { item: LibraryResource }) {
-    const Icon = item.type === "NOTE" ? FileText : Headphones;
     return (
       <article className={cx("library-card", item.locked && "is-locked")}>
         <div className="library-card__icon">
-          <Icon size={22} />
+          <Headphones size={22} />
         </div>
         <div className="library-card__body">
           <div className="library-card__tags">
-            <span>{item.type === "NOTE" ? "Note" : "Audiobook"}</span>
+            <span>Audiobook</span>
             <span className={item.isFree ? "is-free" : "is-premium"}>
               {item.isFree ? "Free" : "Premium"}
             </span>
@@ -167,7 +165,7 @@ function LibrarySectionInner() {
             target="_blank"
           >
             <Unlock size={16} />
-            Open
+            Listen
           </a>
         )}
       </article>
@@ -175,31 +173,31 @@ function LibrarySectionInner() {
   }
 
   const authLinks = {
-    login: buildAuthHref("login", "/dashboard?checkout=library#library", {
+    login: buildAuthHref("login", "/audiobooks?checkout=library", {
       type: "library"
     }),
-    signup: buildAuthHref("signup", "/dashboard?checkout=library#library", {
+    signup: buildAuthHref("signup", "/audiobooks?checkout=library", {
       type: "library"
     })
   };
 
   return (
-    <section className="library-section" id="library">
-      <div className="site-container">
-        <div className="library-section__head">
-          <div>
-            <p className="admin-eyebrow">Free & Premium</p>
-            <h2>Lecture Notes & Audiobooks</h2>
-            <p>
-              Browse free resources first. Create an account only when you are
-              ready to subscribe and unlock the full library.
-            </p>
-          </div>
+    <div className="audiobooks-page">
+      <section className="audiobooks-page__hero">
+        <div className="site-container audiobooks-page__hero-inner">
+          <p className="section-eyebrow">Listen & learn</p>
+          <h1>Audiobooks</h1>
+          <p>
+            Practice listening and pronunciation with curated English audiobooks.
+            Free titles are open to everyone — subscribe only when you want premium
+            access.
+          </p>
           {data ? (
-            <div className="library-plan-card">
-              <span>{data.plan.title}</span>
-              <strong>{formatPaise(data.plan.pricePaise)}</strong>
-              <small>{data.plan.freeLimit} free items included</small>
+            <div className="audiobooks-page__plan">
+              <div>
+                <strong>{formatPaise(data.plan.pricePaise)}</strong>
+                <span>{data.plan.title}</span>
+              </div>
               {data.subscribed ? (
                 <em className="is-active">Subscribed</em>
               ) : (
@@ -218,60 +216,53 @@ function LibrarySectionInner() {
             </div>
           ) : null}
         </div>
+      </section>
 
-        <div className="gallery-tabs">
-          <button
-            className={cx("gallery-tabs__item", tab === "NOTE" && "is-active")}
-            onClick={() => setTab("NOTE")}
-            type="button"
-          >
-            Notes
-          </button>
-          <button
-            className={cx(
-              "gallery-tabs__item",
-              tab === "AUDIOBOOK" && "is-active"
-            )}
-            onClick={() => setTab("AUDIOBOOK")}
-            type="button"
-          >
-            Audiobooks
-          </button>
+      <section className="audiobooks-page__body">
+        <div className="site-container">
+          {message ? <p className="admin-flash">{message}</p> : null}
+          {error ? <p className="admin-state admin-state--error">{error}</p> : null}
+          {loading ? <p className="admin-state">Loading audiobooks...</p> : null}
+
+          {!loading && audiobooks.length === 0 ? (
+            <p className="admin-empty">
+              No audiobooks yet. Check back soon, or browse{" "}
+              <Link href="/dashboard#library">lecture notes</Link>.
+            </p>
+          ) : null}
+
+          <div className="library-grid">
+            {audiobooks.map((item) => (
+              <ResourceCard item={item} key={item.id} />
+            ))}
+          </div>
+
+          {!user ? (
+            <p className="library-section__hint">
+              Free audiobooks are open to everyone.{" "}
+              <Link href={authLinks.signup}>Create an account</Link> or{" "}
+              <Link href={authLinks.login}>log in</Link> only when you want to
+              unlock premium titles.
+            </p>
+          ) : null}
         </div>
-
-        {message ? <p className="admin-flash">{message}</p> : null}
-        {error ? <p className="admin-state admin-state--error">{error}</p> : null}
-        {loading ? <p className="admin-state">Loading resources...</p> : null}
-
-        {!loading && items.length === 0 ? (
-          <p className="admin-empty">
-            No {tab === "NOTE" ? "notes" : "audiobooks"} yet. Check back soon.
-          </p>
-        ) : null}
-
-        <div className="library-grid">
-          {items.map((item) => (
-            <ResourceCard item={item} key={item.id} />
-          ))}
-        </div>
-
-        {!user ? (
-          <p className="library-section__hint">
-            Free items are open to everyone.{" "}
-            <Link href={authLinks.signup}>Create an account</Link> or{" "}
-            <Link href={authLinks.login}>log in</Link> only when you want to pay
-            for premium notes and audiobooks.
-          </p>
-        ) : null}
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
 
-export function LibrarySection() {
+export function AudiobooksPage() {
   return (
-    <Suspense fallback={<section className="library-section" id="library" />}>
-      <LibrarySectionInner />
+    <Suspense
+      fallback={
+        <div className="audiobooks-page">
+          <div className="site-container" style={{ padding: "48px 0" }}>
+            <p className="admin-state">Loading audiobooks...</p>
+          </div>
+        </div>
+      }
+    >
+      <AudiobooksPageInner />
     </Suspense>
   );
 }

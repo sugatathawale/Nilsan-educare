@@ -7,10 +7,6 @@ import { AppError } from "../../middleware/error.middleware.js";
 import type { CreateOrderInput, VerifyPaymentInput } from "./payments.validator.js";
 
 export const createOrder = async (userId: string, input: CreateOrderInput) => {
-  if (!isRazorpayConfigured) {
-    throw new AppError("Payment gateway is not configured", 503);
-  }
-
   const course = await prisma.course.findUnique({
     where: { slug: input.courseSlug, isActive: true }
   });
@@ -27,6 +23,40 @@ export const createOrder = async (userId: string, input: CreateOrderInput) => {
 
   if (existingEnrollment?.status === "PAID") {
     throw new AppError("You are already enrolled in this course", 409);
+  }
+
+  // Dev / no Razorpay: enrol immediately so the checkout flow is usable
+  if (!isRazorpayConfigured) {
+    const demoOrderId = `demo_course_${course.id}_${Date.now()}`;
+
+    await prisma.$transaction([
+      prisma.payment.create({
+        data: {
+          userId,
+          courseId: course.id,
+          razorpayOrderId: demoOrderId,
+          razorpayPaymentId: `demo_pay_${Date.now()}`,
+          amountPaise: course.pricePaise,
+          status: "PAID"
+        }
+      }),
+      prisma.enrollment.upsert({
+        where: {
+          userId_courseId: { userId, courseId: course.id }
+        },
+        update: { status: "PAID" },
+        create: {
+          userId,
+          courseId: course.id,
+          status: "PAID"
+        }
+      })
+    ]);
+
+    return {
+      demo: true as const,
+      courseSlug: course.slug
+    };
   }
 
   const razorpay = getRazorpay();

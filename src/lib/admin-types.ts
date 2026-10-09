@@ -24,8 +24,16 @@ export type CourseSummary = {
   id: string;
   slug: string;
   title: string;
+  tagline: string | null;
   description: string | null;
+  badge: string | null;
+  duration: string | null;
+  level: string | null;
+  mode: string | null;
+  classLength: string | null;
+  imageUrl: string | null;
   pricePaise: number;
+  originalPricePaise: number | null;
   isActive: boolean;
   createdAt: string;
   _count: { lessons: number };

@@ -55,6 +55,8 @@ export function SiteFooter() {
         <div className="site-footer__col">
           <h3>Student</h3>
           <nav aria-label="Footer student links">
+            <Link href="/playlists">Playlist</Link>
+            <Link href="/audiobooks">Audiobooks</Link>
             <Link href="/login">Log in</Link>
             <Link href="/signup">Sign up</Link>
             <Link href="/my-learning">My Learning</Link>

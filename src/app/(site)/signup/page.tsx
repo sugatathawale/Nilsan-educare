@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
 import { ApiRequestError } from "@/lib/api";
+import { resolveAuthNext } from "@/lib/checkout-auth";
 
 const ACADEMIC_YEARS = [
   "1st Year",
@@ -17,8 +18,9 @@ const ACADEMIC_YEARS = [
   "Other"
 ];
 
-export default function StudentSignupPage() {
+function StudentSignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading, signup } = useStudentAuth();
   const [fullName, setFullName] = useState("");
   const [institution, setInstitution] = useState("");
@@ -32,11 +34,18 @@ export default function StudentSignupPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const nextPath = useMemo(
+    () => resolveAuthNext(searchParams),
+    [searchParams]
+  );
+  const loginHref = `/login?next=${encodeURIComponent(nextPath)}`;
+  const checkoutHint = nextPath.includes("checkout=");
+
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/my-learning");
+      router.replace(nextPath);
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, nextPath]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,7 +76,7 @@ export default function StudentSignupPage() {
         state: state.trim() || undefined,
         country: "India"
       });
-      router.replace("/my-learning");
+      router.replace(nextPath);
     } catch (err) {
       setError(
         err instanceof ApiRequestError
@@ -94,7 +103,11 @@ export default function StudentSignupPage() {
         <div>
           <p className="admin-eyebrow">Student Portal</p>
           <h1>Create account</h1>
-          <p>Sign up to enroll in courses and track your learning.</p>
+          <p>
+            {checkoutHint
+              ? "Create an account to continue payment and unlock your purchase."
+              : "Sign up when you are ready to enroll, subscribe, and track your learning."}
+          </p>
         </div>
 
         <div className="auth-grid">
@@ -204,13 +217,31 @@ export default function StudentSignupPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <button className="admin-primary-action" disabled={submitting} type="submit">
-          {submitting ? "Creating account..." : "Sign up"}
+          {submitting
+            ? "Creating account..."
+            : checkoutHint
+              ? "Sign up & continue"
+              : "Sign up"}
         </button>
 
         <p className="auth-switch">
-          Already have an account? <Link href="/login">Log in</Link>
+          Already have an account? <Link href={loginHref}>Log in</Link>
         </p>
       </form>
     </div>
+  );
+}
+
+export default function StudentSignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-page">
+          <p className="admin-state">Loading...</p>
+        </div>
+      }
+    >
+      <StudentSignupForm />
+    </Suspense>
   );
 }
