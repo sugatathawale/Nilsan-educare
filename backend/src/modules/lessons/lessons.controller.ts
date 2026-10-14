@@ -10,6 +10,7 @@ import {
   uploadBunnyVideo
 } from "../../lib/bunny.js";
 import { prisma } from "../../lib/prisma.js";
+import { toEmbedVideoUrl } from "../../lib/video-url.js";
 import { AppError } from "../../middleware/error.middleware.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { getParam } from "../../utils/request.js";
@@ -24,10 +25,11 @@ const withPlayback = <
 >(
   lesson: T
 ) => {
-  const embedUrl =
+  const embedUrl = toEmbedVideoUrl(
     lesson.videoId && isBunnyConfigured
       ? getBunnyEmbedUrl(lesson.videoId)
-      : lesson.videoUrl;
+      : lesson.videoUrl
+  );
 
   return {
     ...lesson,
@@ -178,9 +180,10 @@ export const createLesson = async (
     }
 
     const videoId = req.body.videoId?.trim() || null;
-    const videoUrl =
+    const videoUrl = toEmbedVideoUrl(
       req.body.videoUrl ||
-      (videoId && isBunnyConfigured ? getBunnyEmbedUrl(videoId) : null);
+        (videoId && isBunnyConfigured ? getBunnyEmbedUrl(videoId) : null)
+    );
 
     const lesson = await prisma.lesson.create({
       data: {

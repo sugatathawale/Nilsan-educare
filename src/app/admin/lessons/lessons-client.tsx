@@ -9,6 +9,7 @@ import type {
   CourseSummary,
   LessonItem
 } from "@/lib/admin-types";
+import { toEmbedVideoUrl, videoProviderLabel } from "@/lib/video-url";
 
 export default function AdminLessonsClient() {
   const searchParams = useSearchParams();
@@ -22,6 +23,7 @@ export default function AdminLessonsClient() {
   const [title, setTitle] = useState("");
   const [order, setOrder] = useState("1");
   const [duration, setDuration] = useState("");
+  const [videoUrlInput, setVideoUrlInput] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [manualVideoId, setManualVideoId] = useState("");
   const [message, setMessage] = useState("");
@@ -104,12 +106,13 @@ export default function AdminLessonsClient() {
 
     try {
       let videoId = manualVideoId.trim() || undefined;
-      let videoUrl: string | undefined;
+      let videoUrl: string | undefined =
+        toEmbedVideoUrl(videoUrlInput) || undefined;
 
       if (videoFile) {
         if (!bunny?.configured) {
           throw new Error(
-            "Bunny Stream is not configured. Add keys in backend/.env first."
+            "Bunny Stream is not configured. Add keys in backend/.env first, or paste a YouTube URL instead."
           );
         }
 
@@ -135,6 +138,8 @@ export default function AdminLessonsClient() {
 
         videoUrl = uploaded.embedUrl;
         setUploadProgress("Saving lesson...");
+      } else if (videoUrl) {
+        setUploadProgress("Saving lesson with video URL...");
       }
 
       const payload: Record<string, string | number> = {
@@ -158,6 +163,7 @@ export default function AdminLessonsClient() {
       setLessons(data.lessons);
       setTitle("");
       setDuration("");
+      setVideoUrlInput("");
       setVideoFile(null);
       setManualVideoId("");
       setShowForm(false);
@@ -165,7 +171,9 @@ export default function AdminLessonsClient() {
       setMessage(
         videoFile
           ? "Lesson saved. Bunny may take a few minutes to finish encoding the video."
-          : "Lesson created successfully."
+          : videoUrl
+            ? "Lesson saved with video URL. Students can play it in My Learning."
+            : "Lesson created successfully."
       );
     } catch (err) {
       setUploadProgress("");
@@ -260,7 +268,9 @@ export default function AdminLessonsClient() {
         <div>
           <p className="admin-eyebrow">Lessons</p>
           <h1>Lesson Management</h1>
-          <p>Upload videos to Bunny Stream and attach them to courses.</p>
+          <p>
+            Attach lectures via YouTube (unlisted) URL or Bunny Stream upload.
+          </p>
         </div>
         <button
           className="admin-primary-action"
@@ -362,20 +372,41 @@ export default function AdminLessonsClient() {
             </label>
           </div>
 
+          <label>
+            YouTube / video URL (recommended for MVP)
+            <input
+              onChange={(event) => {
+                setVideoUrlInput(event.target.value);
+                if (event.target.value.trim()) setVideoFile(null);
+              }}
+              placeholder="https://www.youtube.com/watch?v=… or youtu.be/… (unlisted OK)"
+              type="url"
+              value={videoUrlInput}
+            />
+            <small className="admin-field-hint">
+              Paste a watch, share, or embed link. It is converted to an embed URL
+              automatically. Unlisted YouTube is the lowest-cost option.
+            </small>
+          </label>
+
           <label className="admin-file-field">
             <span>
               <Upload size={18} />
-              Upload lecture video
+              Or upload lecture video (Bunny Stream)
             </span>
             <input
               accept="video/*"
-              onChange={(event) => setVideoFile(event.target.files?.[0] || null)}
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                setVideoFile(file);
+                if (file) setVideoUrlInput("");
+              }}
               type="file"
             />
             <small>
               {videoFile
                 ? `${videoFile.name} (${Math.round(videoFile.size / (1024 * 1024))} MB)`
-                : "MP4 / MOV up to 500 MB. Stored on Bunny Stream, not in Neon."}
+                : "Optional. MP4 / MOV up to 500 MB. Requires Bunny Stream keys. Takes priority over URL."}
             </small>
           </label>
 
@@ -412,7 +443,11 @@ export default function AdminLessonsClient() {
                   <strong>{lesson.title}</strong>
                   <span>
                     {lesson.duration || "No duration"} ·{" "}
-                    {lesson.videoId || lesson.videoUrl ? "Video ready" : "No video"}
+                    {lesson.videoId || lesson.videoUrl
+                      ? videoProviderLabel(
+                          lesson.embedUrl || lesson.videoUrl
+                        )
+                      : "No video"}
                   </span>
                 </div>
                 <div className="admin-lesson-card__actions">

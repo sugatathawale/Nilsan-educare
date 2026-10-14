@@ -1,13 +1,14 @@
-# Neon + Bunny Stream setup (Nilsan Educare)
+# Neon + video setup (Nilsan Educare)
 
-Your app uses **two services**:
+Your app uses **Neon** plus a video source:
 
 | Service | Stores | Used for |
 |---|---|---|
 | **Neon (PostgreSQL)** | Users, courses, lessons metadata, payments, enrollments | App database |
-| **Bunny Stream** | Actual video files + streaming | Lecture playback |
+| **YouTube (unlisted)** | Lecture files (free MVP) | Paste URL into Admin → Lessons |
+| **Bunny Stream** (optional) | Hosted video + CDN streaming | Upload MP4 from Admin → Lessons |
 
-Neon never stores video files. Lessons only save `videoId` + embed URL.
+Neon never stores video files. Lessons only save `videoId` and/or an embed `videoUrl`.
 
 ---
 
@@ -122,7 +123,17 @@ Then open:
 
 ---
 
-## How video upload works
+## How lecture video works
+
+### Option A — YouTube unlisted (lowest cost MVP)
+
+1. Upload the lecture on YouTube and set visibility to **Unlisted**.
+2. Copy the watch or share link (`youtube.com/watch?v=…` or `youtu.be/…`).
+3. Admin → **Lessons** → **Add Lesson** → paste into **YouTube / video URL**.
+4. Backend converts it to an embed URL (`youtube.com/embed/VIDEO_ID`) and stores it on the lesson.
+5. Enrolled students open **My Learning → Watch lectures** and play inside the course player iframe.
+
+### Option B — Bunny Stream upload
 
 1. Admin opens **Lessons** → **Add Lesson**.
 2. Fills title / order / duration.
@@ -131,10 +142,11 @@ Then open:
    - Creates a video entry in Bunny
    - Uploads the file to Bunny (API key never leaves the server)
    - Saves `videoId` + embed URL in **Neon** on the `Lesson` row
-5. Students later play via Bunny embed URL  
+5. Students play via Bunny embed URL  
    `https://iframe.mediadelivery.net/embed/{libraryId}/{videoId}`
 
 Deleting a lesson also deletes the Bunny video (when configured).
+File upload takes priority over a pasted URL on the same form.
 
 ---
 

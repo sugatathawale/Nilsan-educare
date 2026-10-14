@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut } from "lucide-react";
+import { BookOpen, ChevronRight, LogOut, Play } from "lucide-react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
 import { apiRequest, formatDate } from "@/lib/api";
 import type { MyEnrollment } from "@/lib/auth-types";
@@ -56,49 +56,65 @@ export default function MyLearningPage() {
 
   if (loading || !user) {
     return (
-      <div className="admin-page">
+      <div className="learn-shell">
         <p className="admin-state">Loading your account...</p>
       </div>
     );
   }
 
+  const firstName = user.fullName.split(" ")[0];
+
   return (
-    <div className="admin-page my-learning">
-      <div className="admin-page__heading">
-        <div>
-          <p className="admin-eyebrow">My Learning</p>
-          <h1>Hi, {user.fullName.split(" ")[0]}</h1>
-          <p>
+    <div className="learn-shell my-learning">
+      <header className="learn-hero">
+        <div className="learn-hero__copy">
+          <p className="learn-kicker">My Learning</p>
+          <h1>Hi, {firstName}</h1>
+          <p className="learn-hero__meta">
             {user.institution} · {user.academicYear} · {user.classGrade}
           </p>
         </div>
-        <div className="my-learning__actions">
-          <Link className="admin-secondary-action" href="/dashboard#courses">
+        <div className="learn-hero__actions">
+          <Link className="learn-btn learn-btn--ghost" href="/dashboard#courses">
             Browse courses
           </Link>
-          <button className="admin-danger-action" onClick={handleLogout} type="button">
+          <button
+            className="learn-btn learn-btn--quiet"
+            onClick={handleLogout}
+            type="button"
+          >
             <LogOut size={16} />
             Logout
           </button>
         </div>
-      </div>
+      </header>
 
-      <section className="admin-panel">
-        <div className="admin-panel__header">
+      <section className="learn-section">
+        <div className="learn-section__head">
           <div>
-            <p className="admin-eyebrow">Enrolled</p>
+            <p className="learn-kicker">Enrolled</p>
             <h2>Your courses</h2>
           </div>
+          {enrollments.length > 0 ? (
+            <span className="learn-count-pill">
+              {enrollments.length}{" "}
+              {enrollments.length === 1 ? "course" : "courses"}
+            </span>
+          ) : null}
         </div>
 
         {fetching ? <p className="admin-state">Loading courses...</p> : null}
         {error ? <p className="admin-state admin-state--error">{error}</p> : null}
 
         {!fetching && !error && enrollments.length === 0 ? (
-          <div className="admin-empty my-learning__empty">
-            <BookOpen size={28} />
-            <p>You have no paid enrollments yet.</p>
-            <Link className="admin-primary-action" href="/courses/speak-english-learn-english">
+          <div className="learn-empty">
+            <BookOpen size={32} />
+            <h3>No courses yet</h3>
+            <p>Enroll in a program to unlock lectures and notes here.</p>
+            <Link
+              className="learn-btn learn-btn--primary"
+              href="/courses/speak-english-learn-english"
+            >
               Explore Speak English course
             </Link>
           </div>
@@ -106,45 +122,75 @@ export default function MyLearningPage() {
 
         {enrollments.length > 0 ? (
           <div className="my-learning__grid">
-            {enrollments.map((enrollment) => (
-              <article className="admin-course-card" key={enrollment.id}>
-                <div className="admin-course-card__top">
-                  <div>
-                    <strong>{enrollment.course.title}</strong>
-                    <span>Enrolled {formatDate(enrollment.createdAt)}</span>
-                  </div>
-                </div>
+            {enrollments.map((enrollment) => {
+              const lessons = enrollment.course.lessons;
+              const preview = lessons.slice(0, 5);
+              const remaining = Math.max(0, lessons.length - preview.length);
+              const continueHref = `/my-learning/${enrollment.course.slug}`;
 
-                <div className="admin-course-card__stats">
-                  <div>
-                    <b>{enrollment.course.lessons.length}</b>
-                    <span>Lessons</span>
-                  </div>
-                  <div>
-                    <b>{enrollment.status}</b>
-                    <span>Status</span>
-                  </div>
-                </div>
+              return (
+                <article className="learn-course-card" key={enrollment.id}>
+                  <div className="learn-course-card__accent" aria-hidden />
+                  <div className="learn-course-card__body">
+                    <div className="learn-course-card__top">
+                      <div>
+                        <div className="learn-course-card__badges">
+                          <span className="learn-badge learn-badge--paid">
+                            {enrollment.status}
+                          </span>
+                          <span className="learn-badge">
+                            {lessons.length} lessons
+                          </span>
+                        </div>
+                        <h3>{enrollment.course.title}</h3>
+                        <p>Enrolled {formatDate(enrollment.createdAt)}</p>
+                      </div>
+                      <Link
+                        className="learn-btn learn-btn--primary learn-btn--icon"
+                        href={continueHref}
+                      >
+                        <Play size={16} fill="currentColor" />
+                        Watch lectures
+                      </Link>
+                    </div>
 
-                <ul className="my-learning__lessons">
-                  {enrollment.course.lessons.slice(0, 4).map((lesson) => (
-                    <li key={lesson.id}>
-                      <span>
-                        {lesson.order}. {lesson.title}
-                      </span>
-                      <small>{lesson.duration || "—"}</small>
-                    </li>
-                  ))}
-                </ul>
+                    <ul className="learn-lesson-preview">
+                      {preview.map((lesson) => (
+                        <li key={lesson.id}>
+                          <Link
+                            href={`/my-learning/${enrollment.course.slug}?lesson=${lesson.id}`}
+                          >
+                            <span className="learn-lesson-preview__index">
+                              {lesson.order}
+                            </span>
+                            <span className="learn-lesson-preview__title">
+                              {lesson.title}
+                            </span>
+                            <small>{lesson.duration || "—"}</small>
+                            <ChevronRight size={16} aria-hidden />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
 
-                <Link
-                  className="admin-secondary-action"
-                  href={`/courses/${enrollment.course.slug}`}
-                >
-                  Open course
-                </Link>
-              </article>
-            ))}
+                    {remaining > 0 ? (
+                      <p className="learn-lesson-preview__more">
+                        +{remaining} more lesson{remaining === 1 ? "" : "s"}
+                      </p>
+                    ) : null}
+
+                    <div className="my-learning__card-actions">
+                      <Link
+                        className="learn-btn learn-btn--ghost"
+                        href={`/courses/${enrollment.course.slug}`}
+                      >
+                        Course details
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : null}
       </section>
