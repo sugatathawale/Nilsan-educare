@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Pencil, PlayCircle, Plus, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ImagePlus, Pencil, PlayCircle, Plus, Trash2, X } from "lucide-react";
 import { AdminStatus } from "@/components/admin/admin-status";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
   apiRequest,
   apiUpload,
@@ -11,7 +13,12 @@ import {
   mediaUrl,
   ApiRequestError
 } from "@/lib/api";
-import type { CourseSummary, EnrollmentRow } from "@/lib/admin-types";
+import {
+  adminKeys,
+  fetchAdminCourses,
+  fetchAdminEnrollments
+} from "@/lib/admin-queries";
+import type { CourseSummary } from "@/lib/admin-types";
 
 const emptyForm = {
   title: "",
@@ -37,37 +44,44 @@ function slugify(value: string) {
 }
 
 export default function AdminCoursesPage() {
-  const [courses, setCourses] = useState<CourseSummary[]>([]);
-  const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [slugTouched, setSlugTouched] = useState(false);
-  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const [coursesData, enrollmentsData] = await Promise.all([
-        apiRequest<{ courses: CourseSummary[] }>("/courses?all=1"),
-        apiRequest<{ enrollments: EnrollmentRow[] }>("/enrollments")
-      ]);
-      setCourses(coursesData.courses);
-      setEnrollments(enrollmentsData.enrollments);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load courses");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const coursesQuery = useQuery({
+    queryKey: adminKeys.courses,
+    queryFn: fetchAdminCourses
+  });
+
+  const enrollmentsQuery = useQuery({
+    queryKey: adminKeys.enrollments,
+    queryFn: fetchAdminEnrollments
+  });
+
+  const courses = coursesQuery.data || [];
+  const enrollments = enrollmentsQuery.data || [];
+  const loading =
+    (coursesQuery.isLoading && !coursesQuery.data) ||
+    (enrollmentsQuery.isLoading && !enrollmentsQuery.data);
+  const error =
+    (coursesQuery.error instanceof Error && coursesQuery.error.message) ||
+    (enrollmentsQuery.error instanceof Error &&
+      enrollmentsQuery.error.message) ||
+    "";
 
   useEffect(() => {
-    void load();
-  }, []);
+    if (!image) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(image);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
 
   const enrollmentCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -81,10 +95,19 @@ export default function AdminCoursesPage() {
     return map;
   }, [enrollments]);
 
+  async function invalidateCourseCaches() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: adminKeys.courses }),
+      queryClient.invalidateQueries({ queryKey: adminKeys.dashboard }),
+      queryClient.invalidateQueries({ queryKey: adminKeys.enrollments })
+    ]);
+  }
+
   function resetForm() {
     setForm(emptyForm);
     setEditingId(null);
     setImage(null);
+    setImagePreview(null);
     setSlugTouched(false);
   }
 
@@ -92,6 +115,8 @@ export default function AdminCoursesPage() {
     setEditingId(course.id);
     setSlugTouched(true);
     setImage(null);
+    setImagePreview(null);
+    setMessage("");
     setForm({
       title: course.title,
       slug: course.slug,
@@ -111,13 +136,8 @@ export default function AdminCoursesPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       const formData = new FormData();
       formData.append("title", form.title.trim());
       formData.append("slug", form.slug.trim() || slugify(form.title));
@@ -142,27 +162,40 @@ export default function AdminCoursesPage() {
       if (image) formData.append("image", image);
 
       if (editingId) {
-        await apiUpload<{ course: CourseSummary }>(
+        return apiUpload<{ course: CourseSummary }>(
           `/courses/${editingId}`,
           formData,
           "PATCH"
         );
-        setMessage("Course updated.");
-      } else {
-        await apiUpload<{ course: CourseSummary }>("/courses", formData);
-        setMessage("Course created.");
       }
-
+      return apiUpload<{ course: CourseSummary }>("/courses", formData);
+    },
+    onSuccess: async () => {
+      setMessage(editingId ? "Course updated." : "Course created.");
       resetForm();
-      await load();
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError || err instanceof Error
-          ? err.message
-          : "Failed to save course"
-      );
-    } finally {
-      setSaving(false);
+      await invalidateCourseCaches();
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (course: CourseSummary) => {
+      await apiRequest(`/courses/${course.id}`, { method: "DELETE" });
+      return course;
+    },
+    onSuccess: async (course) => {
+      setMessage("Course deleted.");
+      if (editingId === course.id) resetForm();
+      await invalidateCourseCaches();
+    }
+  });
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    try {
+      await saveMutation.mutateAsync();
+    } catch {
+      // error shown via mutation.error
     }
   }
 
@@ -170,17 +203,28 @@ export default function AdminCoursesPage() {
     if (!window.confirm(`Delete "${course.title}"? This cannot be undone.`)) {
       return;
     }
-    setError("");
     setMessage("");
     try {
-      await apiRequest(`/courses/${course.id}`, { method: "DELETE" });
-      setMessage("Course deleted.");
-      if (editingId === course.id) resetForm();
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete course");
+      await deleteMutation.mutateAsync(course);
+    } catch {
+      // error shown via mutation.error
     }
   }
+
+  const saving = saveMutation.isPending;
+  const mutationError =
+    (saveMutation.error instanceof ApiRequestError ||
+    saveMutation.error instanceof Error
+      ? saveMutation.error.message
+      : "") ||
+    (deleteMutation.error instanceof Error
+      ? deleteMutation.error.message
+      : "") ||
+    error;
+
+  const editingCourse = editingId
+    ? courses.find((course) => course.id === editingId)
+    : null;
 
   return (
     <div className="admin-page">
@@ -189,8 +233,8 @@ export default function AdminCoursesPage() {
           <p className="admin-eyebrow">Courses</p>
           <h1>Course Catalog</h1>
           <p>
-            Add course details shown on the course page hero. Plan, FAQ, and
-            other sections stay static on the site.
+            Add or edit course details shown on the course page. Change cover
+            photo, price, and listing fields anytime.
           </p>
         </div>
         <Link className="admin-primary-action" href="/admin/lessons">
@@ -199,7 +243,31 @@ export default function AdminCoursesPage() {
         </Link>
       </div>
 
-      <form className="admin-form" onSubmit={handleSubmit}>
+      {editingId ? (
+        <div className="admin-edit-banner">
+          <div>
+            <strong>Editing:</strong> {editingCourse?.title || "Course"}
+            <span>Update cover, price, and listing details below, then save.</span>
+          </div>
+          <button
+            className="admin-secondary-action"
+            onClick={resetForm}
+            type="button"
+          >
+            <X size={16} />
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
+      <form className="admin-form" id="course-editor" onSubmit={handleSubmit}>
+        <div className="admin-panel__header" style={{ marginBottom: 0 }}>
+          <div>
+            <p className="admin-eyebrow">{editingId ? "Edit" : "Create"}</p>
+            <h2>{editingId ? "Edit course" : "Add course"}</h2>
+          </div>
+        </div>
+
         <div className="admin-form__row">
           <label>
             Title *
@@ -232,7 +300,9 @@ export default function AdminCoursesPage() {
         <label>
           Tagline
           <input
-            onChange={(e) => setForm((prev) => ({ ...prev, tagline: e.target.value }))}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, tagline: e.target.value }))
+            }
             placeholder="Short line under the title"
             value={form.tagline}
           />
@@ -254,7 +324,9 @@ export default function AdminCoursesPage() {
           <label>
             Badge
             <input
-              onChange={(e) => setForm((prev) => ({ ...prev, badge: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, badge: e.target.value }))
+              }
               value={form.badge}
             />
           </label>
@@ -273,36 +345,60 @@ export default function AdminCoursesPage() {
           <label>
             Level
             <input
-              onChange={(e) => setForm((prev) => ({ ...prev, level: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, level: e.target.value }))
+              }
               value={form.level}
             />
           </label>
           <label>
             Mode
             <input
-              onChange={(e) => setForm((prev) => ({ ...prev, mode: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, mode: e.target.value }))
+              }
               value={form.mode}
             />
           </label>
         </div>
 
-        <div className="admin-form__row">
-          <label>
-            Class length
-            <input
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, classLength: e.target.value }))
-              }
-              value={form.classLength}
-            />
-          </label>
-          <label>
-            Cover image
+        <label>
+          Class length
+          <input
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, classLength: e.target.value }))
+            }
+            value={form.classLength}
+          />
+        </label>
+
+        <div className="admin-cover-field">
+          <div className="admin-cover-field__preview">
+            {imagePreview || editingCourse?.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt="Course cover preview"
+                src={imagePreview || mediaUrl(editingCourse?.imageUrl)}
+              />
+            ) : (
+              <div className="admin-cover-field__empty">
+                <ImagePlus size={22} />
+                <span>No cover yet</span>
+              </div>
+            )}
+          </div>
+          <label className="admin-cover-field__input">
+            Cover photo {editingId ? "(optional — keep current if empty)" : "*"}
             <input
               accept="image/*"
               onChange={(e) => setImage(e.target.files?.[0] || null)}
               type="file"
             />
+            <small>
+              {image
+                ? `New file: ${image.name}`
+                : "JPG / PNG / WEBP. Shown on the public course page."}
+            </small>
           </label>
         </div>
 
@@ -370,8 +466,10 @@ export default function AdminCoursesPage() {
       </form>
 
       {message ? <p className="admin-flash">{message}</p> : null}
-      {loading ? <p className="admin-state">Loading courses...</p> : null}
-      {error ? <p className="admin-state admin-state--error">{error}</p> : null}
+      {loading ? <LoadingSpinner label="Loading courses…" size="lg" /> : null}
+      {mutationError ? (
+        <p className="admin-state admin-state--error">{mutationError}</p>
+      ) : null}
 
       {!loading && !error && courses.length === 0 ? (
         <p className="admin-empty">No courses yet. Add the first one above.</p>
@@ -380,7 +478,14 @@ export default function AdminCoursesPage() {
       {!loading && courses.length > 0 ? (
         <div className="admin-course-cards">
           {courses.map((course) => (
-            <article className="admin-course-card" key={course.id}>
+            <article
+              className={
+                editingId === course.id
+                  ? "admin-course-card is-editing"
+                  : "admin-course-card"
+              }
+              key={course.id}
+            >
               <div className="admin-course-card__top">
                 <div>
                   <strong>{course.title}</strong>
@@ -396,7 +501,11 @@ export default function AdminCoursesPage() {
                   className="admin-course-card__thumb"
                   src={mediaUrl(course.imageUrl)}
                 />
-              ) : null}
+              ) : (
+                <div className="admin-course-card__thumb admin-course-card__thumb--empty">
+                  No cover photo
+                </div>
+              )}
 
               {course.tagline || course.description ? (
                 <p className="admin-course-card__desc">
@@ -407,7 +516,12 @@ export default function AdminCoursesPage() {
               <div className="admin-course-card__stats">
                 <div>
                   <b>{formatPaise(course.pricePaise)}</b>
-                  <span>Price</span>
+                  <span>
+                    Price
+                    {course.originalPricePaise
+                      ? ` · was ${formatPaise(course.originalPricePaise)}`
+                      : ""}
+                  </span>
                 </div>
                 <div>
                   <b>{course._count.lessons}</b>
@@ -421,7 +535,7 @@ export default function AdminCoursesPage() {
 
               <div className="admin-form__actions">
                 <button
-                  className="admin-secondary-action"
+                  className="admin-primary-action"
                   onClick={() => startEdit(course)}
                   type="button"
                 >

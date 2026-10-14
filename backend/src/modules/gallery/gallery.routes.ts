@@ -46,6 +46,15 @@ galleryRouter.post(
   galleryController.createGalleryImage
 );
 
+
+galleryRouter.patch(
+  "/:id",
+  authenticate,
+  requireAdmin,
+  upload.single("image"),
+  galleryController.updateGalleryImage
+);
+
 galleryRouter.delete(
   "/:id",
   authenticate,

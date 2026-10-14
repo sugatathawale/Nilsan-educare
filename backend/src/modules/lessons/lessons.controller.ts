@@ -204,6 +204,64 @@ export const createLesson = async (
   }
 };
 
+
+export const updateLesson = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = getParam(req.params.id);
+    const existing = await prisma.lesson.findUnique({ where: { id } });
+    if (!existing) {
+      throw new AppError("Lesson not found", 404);
+    }
+
+    const title =
+      typeof req.body.title === "string" && req.body.title.trim()
+        ? req.body.title.trim()
+        : existing.title;
+    const order =
+      req.body.order !== undefined ? Number(req.body.order) : existing.order;
+    if (!Number.isInteger(order) || order < 1) {
+      throw new AppError("Order must be a positive integer", 400);
+    }
+
+    const duration =
+      req.body.duration !== undefined
+        ? req.body.duration?.trim() || null
+        : existing.duration;
+
+    let videoId = existing.videoId;
+    let videoUrl = existing.videoUrl;
+
+    if (req.body.videoId !== undefined) {
+      videoId = req.body.videoId?.trim() || null;
+    }
+
+    if (req.body.videoUrl !== undefined) {
+      videoUrl = toEmbedVideoUrl(req.body.videoUrl) || null;
+    } else if (videoId && isBunnyConfigured && req.body.videoId !== undefined) {
+      videoUrl = toEmbedVideoUrl(getBunnyEmbedUrl(videoId));
+    }
+
+    const lesson = await prisma.lesson.update({
+      where: { id },
+      data: {
+        title,
+        order,
+        duration,
+        videoId,
+        videoUrl
+      }
+    });
+
+    res.json(sendSuccess({ lesson: withPlayback(lesson) }, "Lesson updated"));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteLesson = async (
   req: Request,
   res: Response,

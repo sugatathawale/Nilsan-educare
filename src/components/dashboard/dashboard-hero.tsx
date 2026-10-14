@@ -23,6 +23,7 @@ export function DashboardHero() {
       <div className="site-container dashboard-hero__grid">
         <div className="dashboard-hero__copy">
           <p className="dashboard-hero__eyebrow">Nilsan Educare</p>
+          <p className="dashboard-hero__mobile-kicker">Speak with confidence</p>
           <h1>
             <span className="dashboard-hero__title-line">
               {user ? "Welcome back," : "Welcome,"}
@@ -38,8 +39,8 @@ export function DashboardHero() {
           </p>
           <p className="dashboard-hero__lead dashboard-hero__lead--short">
             {user
-              ? "Continue with personalized 1-on-1 English classes."
-              : "Browse free. Log in only when you’re ready to enroll."}
+              ? "Your 1-on-1 English path starts here."
+              : "Free to browse. Enroll when you’re ready."}
           </p>
 
           <ul className="dashboard-hero__features">
@@ -80,7 +81,7 @@ export function DashboardHero() {
             className="dashboard-hero__teacher"
             height={1024}
             priority
-            sizes="(max-width: 900px) 70vw, (max-width: 1180px) 380px, 520px"
+            sizes="(max-width: 900px) 100vw, (max-width: 1180px) 380px, 520px"
             src="/images/nilesteacher.png"
             width={1536}
           />

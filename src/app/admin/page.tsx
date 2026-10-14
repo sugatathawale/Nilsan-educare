@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   BadgeCheck,
   BookOpen,
@@ -10,51 +10,37 @@ import {
   Users
 } from "lucide-react";
 import { AdminStatus } from "@/components/admin/admin-status";
-import { apiRequest, formatDateTime, formatPaise } from "@/lib/api";
-import type { DashboardStats } from "@/lib/admin-types";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatDateTime, formatPaise } from "@/lib/api";
+import { adminKeys, fetchAdminDashboard } from "@/lib/admin-queries";
 
 export default function AdminPage() {
-  const [data, setData] = useState<DashboardStats | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const dashboardQuery = useQuery({
+    queryKey: adminKeys.dashboard,
+    queryFn: fetchAdminDashboard
+  });
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        const result = await apiRequest<DashboardStats>("/admin/dashboard");
-        if (active) setData(result);
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load dashboard");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (loading) {
+  if (dashboardQuery.isLoading && !dashboardQuery.data) {
     return (
       <div className="admin-page">
-        <p className="admin-state">Loading overview...</p>
+        <LoadingSpinner label="Loading overview…" size="lg" />
       </div>
     );
   }
 
-  if (error || !data) {
+  if (dashboardQuery.error || !dashboardQuery.data) {
     return (
       <div className="admin-page">
-        <p className="admin-state admin-state--error">{error || "No data"}</p>
+        <p className="admin-state admin-state--error">
+          {dashboardQuery.error instanceof Error
+            ? dashboardQuery.error.message
+            : "No data"}
+        </p>
       </div>
     );
   }
+
+  const data = dashboardQuery.data;
 
   const metrics = [
     {
@@ -78,7 +64,7 @@ export default function AdminPage() {
     {
       label: "Recent Payments",
       value: String(data.recentPayments.length),
-      detail: "Latest successful payments shown below",
+      detail: "Latest payment activity",
       icon: CreditCard
     }
   ];
@@ -87,24 +73,24 @@ export default function AdminPage() {
     <div className="admin-page">
       <div className="admin-page__heading">
         <div>
-          <p className="admin-eyebrow">Admin Panel</p>
-          <h1>Dashboard Overview</h1>
-          <p>Live numbers from students, courses, enrollments, and payments.</p>
+          <p className="admin-eyebrow">Overview</p>
+          <h1>Admin Dashboard</h1>
+          <p>Snapshot of students, courses, enrollments, and payments.</p>
         </div>
-        <Link className="admin-primary-action" href="/admin/lessons">
+        <Link className="admin-primary-action" href="/admin/courses">
           <PlayCircle size={18} />
-          Manage Lessons
+          Manage courses
         </Link>
       </div>
 
-      <section className="admin-metrics" aria-label="Admin metrics">
+      <div className="admin-metrics">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
             <article className="admin-metric-card" key={metric.label}>
               <div className="admin-metric-card__top">
                 <span>{metric.label}</span>
-                <Icon size={22} />
+                <Icon size={20} />
               </div>
               <strong>{metric.value}</strong>
               <div className="admin-metric-card__meta">
@@ -113,71 +99,46 @@ export default function AdminPage() {
             </article>
           );
         })}
-      </section>
+      </div>
 
-      <section className="admin-quick-links" aria-label="Quick links">
-        <Link href="/admin/students">
-          <Users size={20} />
-          Students
-        </Link>
-        <Link href="/admin/courses">
-          <BookOpen size={20} />
-          Courses
-        </Link>
-        <Link href="/admin/lessons">
-          <PlayCircle size={20} />
-          Lessons
-        </Link>
-        <Link href="/admin/payments">
-          <CreditCard size={20} />
-          Payments
-        </Link>
-        <Link href="/admin/enrollments">
-          <BadgeCheck size={20} />
-          Enrollments
-        </Link>
-      </section>
-
-      <section className="admin-grid">
-        <article className="admin-panel admin-panel--full">
-          <div className="admin-panel__header">
-            <div>
-              <p className="admin-eyebrow">Commerce</p>
-              <h2>Recent Payments</h2>
-            </div>
-            <Link className="admin-secondary-action" href="/admin/payments">
-              View All
-            </Link>
+      <section className="admin-panel">
+        <div className="admin-panel__header">
+          <div>
+            <p className="admin-eyebrow">Payments</p>
+            <h2>Recent activity</h2>
           </div>
+          <Link className="admin-secondary-action" href="/admin/payments">
+            View all
+          </Link>
+        </div>
 
-          {data.recentPayments.length === 0 ? (
-            <p className="admin-empty">No paid transactions yet.</p>
-          ) : (
-            <div className="admin-table admin-table--payments" role="table">
-              <div className="admin-table__head" role="row">
-                <span>Student</span>
-                <span>Course</span>
-                <span>Amount</span>
-                <span>Date</span>
-                <span>Status</span>
-              </div>
-              {data.recentPayments.map((payment) => (
-                <div className="admin-table__row" role="row" key={payment.id}>
-                  <span>
-                    <strong>{payment.user.fullName}</strong>
-                    <small>{payment.user.email}</small>
-                  </span>
-                  <span>{payment.course.title}</span>
-                  <span>{formatPaise(payment.amountPaise)}</span>
-                  <span>{formatDateTime(payment.createdAt)}</span>
-                  <span>
-                    <AdminStatus status={payment.status} />
-                  </span>
-                </div>
-              ))}
+        {data.recentPayments.length === 0 ? (
+          <p className="admin-empty">No payments yet.</p>
+        ) : (
+          <div className="admin-table admin-table--payments" role="table">
+            <div className="admin-table__head" role="row">
+              <span>Student</span>
+              <span>Course</span>
+              <span>Amount</span>
+              <span>Status</span>
+              <span>When</span>
             </div>
-          )}
-        </article>
+            {data.recentPayments.map((payment) => (
+              <div className="admin-table__row" role="row" key={payment.id}>
+                <span>
+                  <strong>{payment.user.fullName}</strong>
+                  <small>{payment.user.email}</small>
+                </span>
+                <span>{payment.course.title}</span>
+                <span>{formatPaise(payment.amountPaise)}</span>
+                <span>
+                  <AdminStatus status={payment.status} />
+                </span>
+                <span>{formatDateTime(payment.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

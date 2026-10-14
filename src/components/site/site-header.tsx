@@ -2,16 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, Menu, X } from "lucide-react";
+import { ArrowLeft, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
-import { galleryNavLinks, navLinks } from "@/data/dashboard";
+import { navLinks } from "@/data/dashboard";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { cx } from "@/lib/utils";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
-  const [galleryOpen, setGalleryOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -19,7 +18,7 @@ export function SiteHeader() {
   const mainLinks = navLinks.filter((link) => link.label !== "Admin Panel");
   const adminLink = navLinks.find((link) => link.label === "Admin Panel");
   const isAuthPage = pathname === "/login" || pathname === "/signup";
-  const galleryActive = pathname.startsWith("/gallery");
+  const isHome = pathname === "/dashboard" || pathname === "/";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -30,7 +29,6 @@ export function SiteHeader() {
 
   useEffect(() => {
     setOpen(false);
-    setGalleryOpen(false);
   }, [pathname]);
 
   function isActive(href: string) {
@@ -52,71 +50,32 @@ export function SiteHeader() {
       <div className="site-container site-header__shell">
         <div className="site-header__main-inner">
           <div className="site-header__brand">
+            {!isHome ? (
+              <Link
+                aria-label="Back to home"
+                className="site-header__back"
+                href="/dashboard"
+              >
+                <ArrowLeft size={20} />
+                <span className="site-header__back-text">Home</span>
+              </Link>
+            ) : null}
             <BrandLogo compact href="/dashboard" />
           </div>
 
           <nav className="site-header__nav" aria-label="Primary navigation">
-            {mainLinks.map((link) => {
-              if (link.label === "Gallery") {
-                return (
-                  <div
-                    className={cx(
-                      "site-header__dropdown",
-                      galleryActive && "is-active"
-                    )}
-                    key={link.label}
-                    onMouseEnter={() => setGalleryOpen(true)}
-                    onMouseLeave={() => setGalleryOpen(false)}
-                  >
-                    <Link
-                      className={cx(
-                        "site-header__link",
-                        galleryActive && "is-active"
-                      )}
-                      href="/gallery"
-                    >
-                      Gallery
-                      <ChevronDown size={14} />
-                    </Link>
-                    <div
-                      className={cx(
-                        "site-header__dropdown-menu",
-                        galleryOpen && "is-open"
-                      )}
-                    >
-                      <Link
-                        className={cx(pathname === "/gallery" && "is-current")}
-                        href="/gallery"
-                      >
-                        All photos
-                      </Link>
-                      {galleryNavLinks.map((item) => (
-                        <Link
-                          className={cx(isActive(item.href) && "is-current")}
-                          href={item.href}
-                          key={item.href}
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  className={cx(
-                    "site-header__link",
-                    isActive(link.href) && "is-active"
-                  )}
-                  href={link.href}
-                  key={link.label}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
+            {mainLinks.map((link) => (
+              <Link
+                className={cx(
+                  "site-header__link",
+                  isActive(link.href) && "is-active"
+                )}
+                href={link.href}
+                key={link.label}
+              >
+                {link.label}
+              </Link>
+            ))}
 
             {user ? (
               <Link
@@ -186,25 +145,9 @@ export function SiteHeader() {
           <div className="site-header__mobile-panel">
             {mainLinks.map((link) => (
               <Link
-                className={cx(
-                  (link.label === "Gallery"
-                    ? galleryActive
-                    : isActive(link.href)) && "is-active"
-                )}
-                href={link.href}
-                key={link.label}
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-
-            <p className="site-header__mobile-label">Gallery</p>
-            {galleryNavLinks.map((link) => (
-              <Link
                 className={cx(isActive(link.href) && "is-active")}
                 href={link.href}
-                key={link.href}
+                key={link.label}
                 onClick={() => setOpen(false)}
               >
                 {link.label}

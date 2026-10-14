@@ -8,7 +8,8 @@ import { validateBody } from "../../middleware/validate.middleware.js";
 import * as lessonsController from "./lessons.controller.js";
 import {
   createBunnyVideoSchema,
-  createLessonSchema
+  createLessonSchema,
+  updateLessonSchema
 } from "./lessons.validator.js";
 
 const videoUpload = multer({
@@ -112,6 +113,15 @@ lessonsRouter.post(
   requireAdmin,
   notesUpload.single("file"),
   lessonsController.addLessonNote
+);
+
+
+lessonsRouter.patch(
+  "/:id",
+  authenticate,
+  requireAdmin,
+  validateBody(updateLessonSchema),
+  lessonsController.updateLesson
 );
 
 lessonsRouter.delete(

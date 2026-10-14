@@ -70,6 +70,7 @@ libraryRouter.patch(
   "/resources/:id",
   authenticate,
   requireAdmin,
+  upload.single("file"),
   libraryController.updateResource
 );
 

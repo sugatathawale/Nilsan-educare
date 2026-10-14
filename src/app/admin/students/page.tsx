@@ -1,38 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { AdminStatus } from "@/components/admin/admin-status";
-import { apiRequest, formatDate } from "@/lib/api";
-import type { AdminStudent } from "@/lib/admin-types";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatDate } from "@/lib/api";
+import { adminKeys, fetchAdminStudents } from "@/lib/admin-queries";
 
 export default function AdminStudentsPage() {
-  const [students, setStudents] = useState<AdminStudent[]>([]);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
+  const studentsQuery = useQuery({
+    queryKey: adminKeys.students,
+    queryFn: fetchAdminStudents
+  });
 
-    async function load() {
-      try {
-        const data = await apiRequest<{ students: AdminStudent[] }>("/users");
-        if (active) setStudents(data.students);
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load students");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const students = studentsQuery.data || [];
+  const error =
+    studentsQuery.error instanceof Error
+      ? studentsQuery.error.message
+      : "";
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -74,14 +62,16 @@ export default function AdminStudentsPage() {
         <span className="admin-toolbar__count">{filtered.length} students</span>
       </div>
 
-      {loading ? <p className="admin-state">Loading students...</p> : null}
+      {studentsQuery.isLoading && !studentsQuery.data ? (
+        <LoadingSpinner label="Loading students…" size="lg" />
+      ) : null}
       {error ? <p className="admin-state admin-state--error">{error}</p> : null}
 
-      {!loading && !error && filtered.length === 0 ? (
+      {!studentsQuery.isLoading && !error && filtered.length === 0 ? (
         <p className="admin-empty">No students found.</p>
       ) : null}
 
-      {!loading && !error && filtered.length > 0 ? (
+      {!studentsQuery.isLoading && !error && filtered.length > 0 ? (
         <div className="admin-table admin-table--students" role="table">
           <div className="admin-table__head" role="row">
             <span>Student</span>
@@ -91,8 +81,11 @@ export default function AdminStudentsPage() {
             <span>Joined</span>
           </div>
           {filtered.map((student) => {
-            const paid = student.enrollments.filter((item) => item.status === "PAID");
-            const location = [student.city, student.state].filter(Boolean).join(", ") || "—";
+            const paid = student.enrollments.filter(
+              (item) => item.status === "PAID"
+            );
+            const location =
+              [student.city, student.state].filter(Boolean).join(", ") || "—";
 
             return (
               <div className="admin-table__row" role="row" key={student.id}>

@@ -78,6 +78,54 @@ export const createGalleryImage = async (
   }
 };
 
+
+export const updateGalleryImage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = getParam(req.params.id);
+    const existing = await prisma.galleryImage.findUnique({ where: { id } });
+    if (!existing) {
+      throw new AppError("Gallery image not found", 404);
+    }
+
+    let category = existing.category;
+    if (req.body.category) {
+      category = galleryCategorySchema.parse(
+        String(req.body.category).toUpperCase()
+      );
+    }
+
+    const title =
+      req.body.title !== undefined
+        ? typeof req.body.title === "string" && req.body.title.trim()
+          ? req.body.title.trim()
+          : null
+        : existing.title;
+
+    let imageUrl = existing.imageUrl;
+    if (req.file) {
+      imageUrl = `/uploads/gallery/${req.file.filename}`;
+      const oldName = path.basename(existing.imageUrl);
+      await fs.unlink(path.join(uploadsRoot, oldName)).catch(() => undefined);
+    }
+
+    const image = await prisma.galleryImage.update({
+      where: { id },
+      data: { category, title, imageUrl }
+    });
+
+    res.json(sendSuccess({ image }, "Gallery image updated"));
+  } catch (error) {
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(() => undefined);
+    }
+    next(error);
+  }
+};
+
 export const deleteGalleryImage = async (
   req: Request,
   res: Response,

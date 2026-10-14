@@ -2,24 +2,26 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FileText, Plus, Trash2, Upload } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileText, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { apiRequest, apiUpload, mediaUrl, ApiRequestError } from "@/lib/api";
-import type {
-  BunnyVideoConfig,
-  CourseSummary,
-  LessonItem
-} from "@/lib/admin-types";
+import {
+  adminKeys,
+  fetchAdminCoursesActive,
+  fetchAdminLessons,
+  fetchBunnyConfig
+} from "@/lib/admin-queries";
+import type { LessonItem } from "@/lib/admin-types";
 import { toEmbedVideoUrl, videoProviderLabel } from "@/lib/video-url";
 
 export default function AdminLessonsClient() {
   const searchParams = useSearchParams();
   const presetCourse = searchParams.get("course") || "";
+  const queryClient = useQueryClient();
 
-  const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [courseSlug, setCourseSlug] = useState(presetCourse);
-  const [lessons, setLessons] = useState<LessonItem[]>([]);
-  const [bunny, setBunny] = useState<BunnyVideoConfig | null>(null);
   const [showForm, setShowForm] = useState(Boolean(presetCourse));
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [order, setOrder] = useState("1");
   const [duration, setDuration] = useState("");
@@ -27,84 +29,71 @@ export default function AdminLessonsClient() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [manualVideoId, setManualVideoId] = useState("");
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [noteLessonId, setNoteLessonId] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteFile, setNoteFile] = useState<File | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const coursesQuery = useQuery({
+    queryKey: [...adminKeys.courses, "active"] as const,
+    queryFn: fetchAdminCoursesActive
+  });
 
-    async function loadCourses() {
-      try {
-        const [coursesData, bunnyData] = await Promise.all([
-          apiRequest<{ courses: CourseSummary[] }>("/courses"),
-          apiRequest<BunnyVideoConfig>("/lessons/video-config")
-        ]);
-        if (!active) return;
-        setCourses(coursesData.courses);
-        setBunny(bunnyData);
-        setCourseSlug((current) => current || coursesData.courses[0]?.slug || "");
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load courses");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
+  const bunnyQuery = useQuery({
+    queryKey: adminKeys.bunnyConfig,
+    queryFn: fetchBunnyConfig
+  });
 
-    void loadCourses();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const courses = coursesQuery.data || [];
+  const bunny = bunnyQuery.data || null;
 
   useEffect(() => {
-    if (!courseSlug) {
-      setLessons([]);
-      return;
+    if (!courseSlug && courses[0]?.slug) {
+      setCourseSlug(courses[0].slug);
     }
+  }, [courseSlug, courses]);
 
-    let active = true;
+  const lessonsQuery = useQuery({
+    queryKey: adminKeys.lessons(courseSlug),
+    queryFn: () => fetchAdminLessons(courseSlug),
+    enabled: Boolean(courseSlug)
+  });
 
-    async function loadLessons() {
-      try {
-        const data = await apiRequest<{ lessons: LessonItem[] }>(
-          `/lessons/course/${courseSlug}`
-        );
-        if (!active) return;
-        setLessons(data.lessons);
-        const nextOrder =
-          data.lessons.reduce((max, lesson) => Math.max(max, lesson.order), 0) +
-          1;
-        setOrder(String(nextOrder));
-        setError("");
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load lessons");
-          setLessons([]);
-        }
-      }
-    }
+  const lessons = lessonsQuery.data || [];
 
-    void loadLessons();
-    return () => {
-      active = false;
-    };
-  }, [courseSlug]);
+  useEffect(() => {
+    if (editingId) return;
+    const nextOrder =
+      lessons.reduce((max, lesson) => Math.max(max, lesson.order), 0) + 1;
+    setOrder(String(nextOrder));
+  }, [lessons, editingId]);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-    setError("");
-    setSaving(true);
+  function resetForm() {
+    setEditingId(null);
+    setTitle("");
+    setDuration("");
+    setVideoUrlInput("");
+    setVideoFile(null);
+    setManualVideoId("");
     setUploadProgress("");
+    setShowForm(false);
+  }
 
-    try {
+  function startEdit(lesson: LessonItem) {
+    setEditingId(lesson.id);
+    setShowForm(true);
+    setTitle(lesson.title);
+    setOrder(String(lesson.order));
+    setDuration(lesson.duration || "");
+    setVideoUrlInput(lesson.videoUrl || lesson.embedUrl || "");
+    setManualVideoId(lesson.videoId || "");
+    setVideoFile(null);
+    setMessage("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       let videoId = manualVideoId.trim() || undefined;
       let videoUrl: string | undefined =
         toEmbedVideoUrl(videoUrlInput) || undefined;
@@ -129,61 +118,117 @@ export default function AdminLessonsClient() {
         videoUrl = created.embedUrl;
 
         setUploadProgress("Uploading video file to Bunny Stream...");
-        const formData = new FormData();
-        formData.append("video", videoFile);
         const uploaded = await apiUpload<{
           videoId: string;
           embedUrl: string;
-        }>(`/lessons/videos/${videoId}/upload`, formData);
+        }>(`/lessons/videos/${videoId}/upload`, formDataFromVideo(videoFile));
 
         videoUrl = uploaded.embedUrl;
         setUploadProgress("Saving lesson...");
       } else if (videoUrl) {
-        setUploadProgress("Saving lesson with video URL...");
+        setUploadProgress(
+          editingId ? "Updating lesson..." : "Saving lesson with video URL..."
+        );
       }
 
       const payload: Record<string, string | number> = {
-        courseSlug,
         title: title.trim(),
         order: Number(order)
       };
 
       if (duration.trim()) payload.duration = duration.trim();
+      else if (editingId) payload.duration = "";
+
       if (videoId) payload.videoId = videoId;
       if (videoUrl) payload.videoUrl = videoUrl;
 
+      if (editingId) {
+        await apiRequest<{ lesson: LessonItem }>(`/lessons/${editingId}`, {
+          method: "PATCH",
+          body: payload
+        });
+        return "updated" as const;
+      }
+
       await apiRequest<{ lesson: LessonItem }>("/lessons", {
         method: "POST",
-        body: payload
+        body: { ...payload, courseSlug }
       });
-
-      const data = await apiRequest<{ lessons: LessonItem[] }>(
-        `/lessons/course/${courseSlug}`
-      );
-      setLessons(data.lessons);
-      setTitle("");
-      setDuration("");
-      setVideoUrlInput("");
-      setVideoFile(null);
-      setManualVideoId("");
-      setShowForm(false);
+      return "created" as const;
+    },
+    onSuccess: async (mode) => {
       setUploadProgress("");
       setMessage(
-        videoFile
-          ? "Lesson saved. Bunny may take a few minutes to finish encoding the video."
-          : videoUrl
-            ? "Lesson saved with video URL. Students can play it in My Learning."
+        mode === "updated"
+          ? "Lesson updated."
+          : videoFile
+            ? "Lesson saved. Bunny may take a few minutes to finish encoding the video."
             : "Lesson created successfully."
       );
-    } catch (err) {
+      resetForm();
+      await queryClient.invalidateQueries({
+        queryKey: adminKeys.lessons(courseSlug)
+      });
+    },
+    onError: () => {
       setUploadProgress("");
-      setError(
-        err instanceof ApiRequestError || err instanceof Error
-          ? err.message
-          : "Failed to create lesson"
-      );
-    } finally {
-      setSaving(false);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest<null>(`/lessons/${id}`, { method: "DELETE" });
+      return id;
+    },
+    onSuccess: async () => {
+      setMessage("Lesson deleted.");
+      if (editingId) resetForm();
+      await queryClient.invalidateQueries({
+        queryKey: adminKeys.lessons(courseSlug)
+      });
+    }
+  });
+
+  const noteMutation = useMutation({
+    mutationFn: async () => {
+      if (!noteLessonId || !noteFile) {
+        throw new Error("Choose a lesson note file.");
+      }
+      const formData = new FormData();
+      formData.append("file", noteFile);
+      if (noteTitle.trim()) formData.append("title", noteTitle.trim());
+      await apiUpload(`/lessons/${noteLessonId}/notes`, formData);
+    },
+    onSuccess: async () => {
+      setNoteFile(null);
+      setNoteTitle("");
+      setNoteLessonId(null);
+      setMessage("Lecture note uploaded.");
+      await queryClient.invalidateQueries({
+        queryKey: adminKeys.lessons(courseSlug)
+      });
+    }
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      await apiRequest<null>(`/lessons/notes/${noteId}`, { method: "DELETE" });
+    },
+    onSuccess: async () => {
+      setMessage("Lecture note deleted.");
+      await queryClient.invalidateQueries({
+        queryKey: adminKeys.lessons(courseSlug)
+      });
+    }
+  });
+
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    try {
+      await saveMutation.mutateAsync();
+    } catch {
+      // surfaced below
     }
   }
 
@@ -191,76 +236,65 @@ export default function AdminLessonsClient() {
     if (!window.confirm("Delete this lesson and its Bunny video (if any)?")) {
       return;
     }
-
     setMessage("");
-    setError("");
-
     try {
-      await apiRequest<null>(`/lessons/${id}`, { method: "DELETE" });
-      setLessons((prev) => prev.filter((lesson) => lesson.id !== id));
-      setMessage("Lesson deleted.");
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : "Failed to delete lesson"
-      );
+      await deleteMutation.mutateAsync(id);
+    } catch {
+      // surfaced below
     }
   }
 
   async function handleNoteUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!noteLessonId || !noteFile) {
-      setError("Choose a lesson note file.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
     setMessage("");
-
     try {
-      const formData = new FormData();
-      formData.append("file", noteFile);
-      if (noteTitle.trim()) formData.append("title", noteTitle.trim());
-      await apiUpload(`/lessons/${noteLessonId}/notes`, formData);
-
-      const data = await apiRequest<{ lessons: LessonItem[] }>(
-        `/lessons/course/${courseSlug}`
-      );
-      setLessons(data.lessons);
-      setNoteFile(null);
-      setNoteTitle("");
-      setNoteLessonId(null);
-      setMessage("Lecture note uploaded.");
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError || err instanceof Error
-          ? err.message
-          : "Failed to upload note"
-      );
-    } finally {
-      setSaving(false);
+      await noteMutation.mutateAsync();
+    } catch {
+      // surfaced below
     }
   }
 
   async function handleDeleteNote(noteId: string) {
     if (!window.confirm("Delete this lecture note?")) return;
+    setMessage("");
     try {
-      await apiRequest<null>(`/lessons/notes/${noteId}`, { method: "DELETE" });
-      setLessons((prev) =>
-        prev.map((lesson) => ({
-          ...lesson,
-          notes: (lesson.notes || []).filter((note) => note.id !== noteId)
-        }))
-      );
-      setMessage("Lecture note deleted.");
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError ? err.message : "Failed to delete note"
-      );
+      await deleteNoteMutation.mutateAsync(noteId);
+    } catch {
+      // surfaced below
     }
   }
+
+  const loading =
+    coursesQuery.isLoading ||
+    bunnyQuery.isLoading ||
+    (Boolean(courseSlug) && lessonsQuery.isLoading);
+
+  const saving =
+    saveMutation.isPending ||
+    noteMutation.isPending ||
+    deleteMutation.isPending;
+
+  const error =
+    (coursesQuery.error instanceof Error
+      ? coursesQuery.error.message
+      : "") ||
+    (lessonsQuery.error instanceof Error
+      ? lessonsQuery.error.message
+      : "") ||
+    (saveMutation.error instanceof ApiRequestError ||
+    saveMutation.error instanceof Error
+      ? saveMutation.error.message
+      : "") ||
+    (deleteMutation.error instanceof Error
+      ? deleteMutation.error.message
+      : "") ||
+    (noteMutation.error instanceof ApiRequestError ||
+    noteMutation.error instanceof Error
+      ? noteMutation.error.message
+      : "") ||
+    (deleteNoteMutation.error instanceof Error
+      ? deleteNoteMutation.error.message
+      : "");
 
   return (
     <div className="admin-page">
@@ -270,15 +304,20 @@ export default function AdminLessonsClient() {
           <h1>Lesson Management</h1>
           <p>
             Attach lectures via YouTube (unlisted) URL or Bunny Stream upload.
+            Edit any lesson to change title, order, duration, or video.
           </p>
         </div>
         <button
           className="admin-primary-action"
           disabled={!courseSlug}
           onClick={() => {
+            if (showForm && editingId) {
+              resetForm();
+              return;
+            }
             setShowForm((value) => !value);
+            setEditingId(null);
             setMessage("");
-            setError("");
           }}
           type="button"
         >
@@ -308,7 +347,10 @@ export default function AdminLessonsClient() {
         <label className="admin-select-field">
           Course
           <select
-            onChange={(event) => setCourseSlug(event.target.value)}
+            onChange={(event) => {
+              setCourseSlug(event.target.value);
+              resetForm();
+            }}
             value={courseSlug}
           >
             {courses.length === 0 ? <option value="">No courses</option> : null}
@@ -327,7 +369,14 @@ export default function AdminLessonsClient() {
       {loading ? <p className="admin-state">Loading...</p> : null}
 
       {showForm ? (
-        <form className="admin-form" onSubmit={handleCreate}>
+        <form className="admin-form" onSubmit={handleSave}>
+          <div className="admin-panel__header" style={{ marginBottom: 0 }}>
+            <div>
+              <p className="admin-eyebrow">{editingId ? "Edit" : "Create"}</p>
+              <h2>{editingId ? "Edit lesson" : "Add lesson"}</h2>
+            </div>
+          </div>
+
           <div className="admin-form__row">
             <label>
               Lesson title
@@ -373,7 +422,7 @@ export default function AdminLessonsClient() {
           </div>
 
           <label>
-            YouTube / video URL (recommended for MVP)
+            YouTube / video URL
             <input
               onChange={(event) => {
                 setVideoUrlInput(event.target.value);
@@ -385,28 +434,32 @@ export default function AdminLessonsClient() {
             />
             <small className="admin-field-hint">
               Paste a watch, share, or embed link. It is converted to an embed URL
-              automatically. Unlisted YouTube is the lowest-cost option.
+              automatically.
             </small>
           </label>
 
           <label className="admin-file-field">
             <span>
               <Upload size={18} />
-              Or upload lecture video (Bunny Stream)
+              {editingId
+                ? "Replace lecture video (Bunny Stream)"
+                : "Or upload lecture video (Bunny Stream)"}
             </span>
             <input
               accept="video/*"
               onChange={(event) => {
-                const file = event.target.files?.[0] || null;
-                setVideoFile(file);
-                if (file) setVideoUrlInput("");
+                const next = event.target.files?.[0] || null;
+                setVideoFile(next);
+                if (next) setVideoUrlInput("");
               }}
               type="file"
             />
             <small>
               {videoFile
                 ? `${videoFile.name} (${Math.round(videoFile.size / (1024 * 1024))} MB)`
-                : "Optional. MP4 / MOV up to 500 MB. Requires Bunny Stream keys. Takes priority over URL."}
+                : editingId
+                  ? "Optional. Leave empty to keep the current video."
+                  : "Optional. MP4 / MOV up to 500 MB. Requires Bunny Stream keys."}
             </small>
           </label>
 
@@ -417,13 +470,18 @@ export default function AdminLessonsClient() {
           <div className="admin-form__actions">
             <button
               className="admin-secondary-action"
-              onClick={() => setShowForm(false)}
+              onClick={resetForm}
               type="button"
             >
               Cancel
             </button>
-            <button className="admin-primary-action" disabled={saving} type="submit">
-              {saving ? "Saving..." : "Save lesson"}
+            <button
+              className="admin-primary-action"
+              disabled={saving}
+              type="submit"
+            >
+              {editingId ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving ? "Saving..." : editingId ? "Update lesson" : "Save lesson"}
             </button>
           </div>
         </form>
@@ -451,6 +509,14 @@ export default function AdminLessonsClient() {
                   </span>
                 </div>
                 <div className="admin-lesson-card__actions">
+                  <button
+                    className="admin-secondary-action"
+                    onClick={() => startEdit(lesson)}
+                    type="button"
+                  >
+                    <Pencil size={16} />
+                    Edit
+                  </button>
                   {lesson.embedUrl || lesson.videoUrl ? (
                     <a
                       className="admin-secondary-action"
@@ -488,7 +554,11 @@ export default function AdminLessonsClient() {
                 <ul className="admin-note-list">
                   {(lesson.notes || []).map((note) => (
                     <li key={note.id}>
-                      <a href={mediaUrl(note.fileUrl)} rel="noreferrer" target="_blank">
+                      <a
+                        href={mediaUrl(note.fileUrl)}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
                         {note.title}
                       </a>
                       <button
@@ -536,4 +606,10 @@ export default function AdminLessonsClient() {
       ) : null}
     </div>
   );
+}
+
+function formDataFromVideo(file: File) {
+  const formData = new FormData();
+  formData.append("video", file);
+  return formData;
 }

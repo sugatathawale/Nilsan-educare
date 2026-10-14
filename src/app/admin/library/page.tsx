@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Headphones, FileText, Trash2, Upload } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Headphones, FileText, Pencil, Trash2, Upload } from "lucide-react";
 import {
   apiRequest,
   apiUpload,
@@ -9,13 +10,14 @@ import {
   mediaUrl,
   ApiRequestError
 } from "@/lib/api";
+import { adminKeys, fetchAdminLibrary } from "@/lib/admin-queries";
 import type { LibraryPlan, LibraryResource, ResourceType } from "@/lib/library";
 import { cx } from "@/lib/utils";
 
 export default function AdminLibraryPage() {
-  const [plan, setPlan] = useState<LibraryPlan | null>(null);
-  const [resources, setResources] = useState<LibraryResource[]>([]);
+  const queryClient = useQueryClient();
   const [type, setType] = useState<ResourceType>("NOTE");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isFree, setIsFree] = useState(false);
@@ -23,10 +25,22 @@ export default function AdminLibraryPage() {
   const [priceRupees, setPriceRupees] = useState("499");
   const [freeLimit, setFreeLimit] = useState("5");
   const [planTitle, setPlanTitle] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const libraryQuery = useQuery({
+    queryKey: adminKeys.library,
+    queryFn: fetchAdminLibrary
+  });
+
+  const plan = libraryQuery.data?.plan || null;
+  const resources = libraryQuery.data?.resources || [];
+
+  useEffect(() => {
+    if (!plan) return;
+    setPriceRupees(String(Math.round(plan.pricePaise / 100)));
+    setFreeLimit(String(plan.freeLimit));
+    setPlanTitle(plan.title);
+  }, [plan]);
 
   const notes = useMemo(
     () => resources.filter((item) => item.type === "NOTE"),
@@ -37,37 +51,29 @@ export default function AdminLibraryPage() {
     [resources]
   );
 
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await apiRequest<{
-        plan: LibraryPlan;
-        resources: LibraryResource[];
-      }>("/library");
-      setPlan(data.plan);
-      setResources(data.resources);
-      setPriceRupees(String(Math.round(data.plan.pricePaise / 100)));
-      setFreeLimit(String(data.plan.freeLimit));
-      setPlanTitle(data.plan.title);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load library");
-    } finally {
-      setLoading(false);
-    }
+  function resetResourceForm() {
+    setEditingId(null);
+    setTitle("");
+    setDescription("");
+    setFile(null);
+    setIsFree(false);
+    setType("NOTE");
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
-
-  async function handlePlanSave(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
+  function startEdit(resource: LibraryResource) {
+    setEditingId(resource.id);
+    setType(resource.type);
+    setTitle(resource.title);
+    setDescription(resource.description || "");
+    setIsFree(resource.isFree);
+    setFile(null);
     setMessage("");
-    try {
-      const data = await apiRequest<{ plan: LibraryPlan }>("/library/plan", {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const planMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest<{ plan: LibraryPlan }>("/library/plan", {
         method: "PUT",
         body: {
           title: planTitle,
@@ -76,72 +82,101 @@ export default function AdminLibraryPage() {
           description: plan?.description
         }
       });
-      setPlan(data.plan);
+    },
+    onSuccess: async () => {
       setMessage("Subscription plan updated.");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update plan");
-    } finally {
-      setSaving(false);
+      await queryClient.invalidateQueries({ queryKey: adminKeys.library });
     }
-  }
+  });
 
-  async function handleUpload(event: FormEvent) {
-    event.preventDefault();
-    if (!file) {
-      setError("Choose a file to upload.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    setMessage("");
-    try {
+  const saveResourceMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingId && !file) {
+        throw new Error("Choose a file to upload.");
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      if (file) formData.append("file", file);
       formData.append("type", type);
       formData.append("title", title.trim());
       formData.append("description", description.trim());
       formData.append("isFree", String(isFree));
-      await apiUpload("/library/resources", formData);
-      setTitle("");
-      setDescription("");
-      setFile(null);
-      setIsFree(false);
-      setMessage(`${type === "NOTE" ? "Note" : "Audiobook"} uploaded.`);
-      await load();
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError || err instanceof Error
-          ? err.message
-          : "Upload failed"
+
+      if (editingId) {
+        return apiUpload(`/library/resources/${editingId}`, formData, "PATCH");
+      }
+      return apiUpload("/library/resources", formData);
+    },
+    onSuccess: async () => {
+      setMessage(
+        editingId
+          ? "Resource updated."
+          : `${type === "NOTE" ? "Note" : "Audiobook"} uploaded.`
       );
-    } finally {
-      setSaving(false);
+      resetResourceForm();
+      await queryClient.invalidateQueries({ queryKey: adminKeys.library });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest(`/library/resources/${id}`, { method: "DELETE" });
+      return id;
+    },
+    onSuccess: async () => {
+      setMessage("Resource deleted.");
+      if (editingId) resetResourceForm();
+      await queryClient.invalidateQueries({ queryKey: adminKeys.library });
+    }
+  });
+
+  async function handlePlanSave(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    try {
+      await planMutation.mutateAsync();
+    } catch {
+      // surfaced below
     }
   }
 
-  async function toggleFree(resource: LibraryResource) {
+  async function handleResourceSubmit(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
     try {
-      await apiRequest(`/library/resources/${resource.id}`, {
-        method: "PATCH",
-        body: { isFree: !resource.isFree }
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      await saveResourceMutation.mutateAsync();
+    } catch {
+      // surfaced below
     }
   }
 
   async function removeResource(id: string) {
     if (!window.confirm("Delete this resource?")) return;
+    setMessage("");
     try {
-      await apiRequest(`/library/resources/${id}`, { method: "DELETE" });
-      setResources((prev) => prev.filter((item) => item.id !== id));
-      setMessage("Resource deleted.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      await deleteMutation.mutateAsync(id);
+    } catch {
+      // surfaced below
     }
   }
+
+  const saving =
+    planMutation.isPending ||
+    saveResourceMutation.isPending ||
+    deleteMutation.isPending;
+
+  const error =
+    (libraryQuery.error instanceof Error
+      ? libraryQuery.error.message
+      : "") ||
+    (planMutation.error instanceof Error ? planMutation.error.message : "") ||
+    (saveResourceMutation.error instanceof ApiRequestError ||
+    saveResourceMutation.error instanceof Error
+      ? saveResourceMutation.error.message
+      : "") ||
+    (deleteMutation.error instanceof Error
+      ? deleteMutation.error.message
+      : "");
 
   function ResourceList({
     items,
@@ -161,22 +196,30 @@ export default function AdminLibraryPage() {
             <div>
               <strong>{item.title}</strong>
               <small>
-                {item.isFree ? "Free" : "Premium"} ·{" "}
-                <a href={mediaUrl(item.fileUrl || "")} target="_blank" rel="noreferrer">
-                  Open file
-                </a>
+                {item.isFree ? "Free" : "Premium"}
+                {item.description ? ` · ${item.description}` : ""}
+                {item.fileUrl ? (
+                  <>
+                    {" · "}
+                    <a
+                      href={mediaUrl(item.fileUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open file
+                    </a>
+                  </>
+                ) : null}
               </small>
             </div>
             <div className="admin-library-row__actions">
               <button
-                className={cx(
-                  "admin-filter",
-                  item.isFree && "is-active"
-                )}
-                onClick={() => void toggleFree(item)}
+                className="admin-secondary-action"
+                onClick={() => startEdit(item)}
                 type="button"
               >
-                {item.isFree ? "Free" : "Mark free"}
+                <Pencil size={16} />
+                Edit
               </button>
               <button
                 className="admin-danger-action"
@@ -200,15 +243,17 @@ export default function AdminLibraryPage() {
           <p className="admin-eyebrow">Library</p>
           <h1>Notes & Audiobooks</h1>
           <p>
-            Upload free and premium resources. Students get a few free; the rest
-            need a subscription.
+            Upload and edit free or premium resources. Students get a few free;
+            the rest need a subscription.
           </p>
         </div>
       </div>
 
       {message ? <p className="admin-flash">{message}</p> : null}
       {error ? <p className="admin-state admin-state--error">{error}</p> : null}
-      {loading ? <p className="admin-state">Loading library...</p> : null}
+      {libraryQuery.isLoading ? (
+        <p className="admin-state">Loading library...</p>
+      ) : null}
 
       <form className="admin-form" onSubmit={handlePlanSave}>
         <div className="admin-panel__header" style={{ marginBottom: 0 }}>
@@ -257,22 +302,26 @@ export default function AdminLibraryPage() {
         </label>
         <div className="admin-form__actions">
           <button className="admin-primary-action" disabled={saving} type="submit">
+            <Pencil size={16} />
             Save plan
           </button>
         </div>
       </form>
 
-      <form className="admin-form" onSubmit={handleUpload}>
+      <form className="admin-form" onSubmit={handleResourceSubmit}>
         <div className="admin-panel__header" style={{ marginBottom: 0 }}>
           <div>
-            <p className="admin-eyebrow">Upload</p>
-            <h2>Add note or audiobook</h2>
+            <p className="admin-eyebrow">{editingId ? "Edit" : "Upload"}</p>
+            <h2>
+              {editingId ? "Edit note or audiobook" : "Add note or audiobook"}
+            </h2>
           </div>
         </div>
 
         <div className="gallery-tabs admin-gallery-tabs">
           <button
             className={cx("gallery-tabs__item", type === "NOTE" && "is-active")}
+            disabled={Boolean(editingId)}
             onClick={() => setType("NOTE")}
             type="button"
           >
@@ -283,6 +332,7 @@ export default function AdminLibraryPage() {
               "gallery-tabs__item",
               type === "AUDIOBOOK" && "is-active"
             )}
+            disabled={Boolean(editingId)}
             onClick={() => setType("AUDIOBOOK")}
             type="button"
           >
@@ -306,7 +356,7 @@ export default function AdminLibraryPage() {
           <label className="admin-file-field">
             <span>
               <Upload size={18} />
-              Choose file
+              {editingId ? "Replace file (optional)" : "Choose file"}
             </span>
             <input
               accept={
@@ -320,9 +370,11 @@ export default function AdminLibraryPage() {
             <small>
               {file
                 ? file.name
-                : type === "NOTE"
-                  ? "PDF / DOC up to 80 MB"
-                  : "MP3 / audio up to 80 MB"}
+                : editingId
+                  ? "Leave empty to keep the current file"
+                  : type === "NOTE"
+                    ? "PDF / DOC up to 80 MB"
+                    : "MP3 / audio up to 80 MB"}
             </small>
           </label>
         </div>
@@ -347,8 +399,22 @@ export default function AdminLibraryPage() {
 
         <div className="admin-form__actions">
           <button className="admin-primary-action" disabled={saving} type="submit">
-            {saving ? "Uploading..." : "Upload resource"}
+            {editingId ? <Pencil size={16} /> : <Upload size={16} />}
+            {saving
+              ? "Saving..."
+              : editingId
+                ? "Update resource"
+                : "Upload resource"}
           </button>
+          {editingId ? (
+            <button
+              className="admin-secondary-action"
+              onClick={resetResourceForm}
+              type="button"
+            >
+              Cancel edit
+            </button>
+          ) : null}
         </div>
       </form>
 

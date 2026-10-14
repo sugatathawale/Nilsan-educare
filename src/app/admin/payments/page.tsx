@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { AdminStatus } from "@/components/admin/admin-status";
-import { apiRequest, formatDateTime, formatPaise } from "@/lib/api";
-import type { PaymentRow, PaymentStatus } from "@/lib/admin-types";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatDateTime, formatPaise } from "@/lib/api";
+import { adminKeys, fetchAdminPayments } from "@/lib/admin-queries";
+import type { PaymentStatus } from "@/lib/admin-types";
 
 const STATUS_FILTERS: Array<"ALL" | PaymentStatus> = [
   "ALL",
@@ -14,33 +17,15 @@ const STATUS_FILTERS: Array<"ALL" | PaymentStatus> = [
 ];
 
 export default function AdminPaymentsPage() {
-  const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"ALL" | PaymentStatus>("ALL");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
+  const paymentsQuery = useQuery({
+    queryKey: adminKeys.payments,
+    queryFn: fetchAdminPayments
+  });
 
-    async function load() {
-      try {
-        const data = await apiRequest<{ payments: PaymentRow[] }>("/payments");
-        if (active) setPayments(data.payments);
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load payments");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const payments = paymentsQuery.data || [];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,11 +76,7 @@ export default function AdminPaymentsPage() {
         <div className="admin-filter-group">
           {STATUS_FILTERS.map((item) => (
             <button
-              className={
-                status === item
-                  ? "admin-filter is-active"
-                  : "admin-filter"
-              }
+              className={status === item ? "admin-filter is-active" : "admin-filter"}
               key={item}
               onClick={() => setStatus(item)}
               type="button"
@@ -107,14 +88,27 @@ export default function AdminPaymentsPage() {
         <span className="admin-toolbar__count">{filtered.length} payments</span>
       </div>
 
-      {loading ? <p className="admin-state">Loading payments...</p> : null}
-      {error ? <p className="admin-state admin-state--error">{error}</p> : null}
+      {paymentsQuery.isLoading ? (
+        <LoadingSpinner label="Loading payments…" size="lg" />
+      ) : null}
 
-      {!loading && !error && filtered.length === 0 ? (
+      {paymentsQuery.isError ? (
+        <p className="admin-state admin-state--error">
+          {paymentsQuery.error instanceof Error
+            ? paymentsQuery.error.message
+            : "Failed to load payments"}
+        </p>
+      ) : null}
+
+      {!paymentsQuery.isLoading &&
+      !paymentsQuery.isError &&
+      filtered.length === 0 ? (
         <p className="admin-empty">No payments match your filters.</p>
       ) : null}
 
-      {!loading && !error && filtered.length > 0 ? (
+      {!paymentsQuery.isLoading &&
+      !paymentsQuery.isError &&
+      filtered.length > 0 ? (
         <div className="admin-table admin-table--payments-full" role="table">
           <div className="admin-table__head" role="row">
             <span>Student</span>

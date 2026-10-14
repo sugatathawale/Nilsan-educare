@@ -207,6 +207,22 @@ export const updateResource = async (
     const existing = await prisma.libraryResource.findUnique({ where: { id } });
     if (!existing) throw new AppError("Resource not found", 404);
 
+    const parseBool = (value: unknown, fallback: boolean) => {
+      if (value === undefined || value === null || value === "") return fallback;
+      if (typeof value === "boolean") return value;
+      if (typeof value === "string") {
+        return value === "true" || value === "1";
+      }
+      return Boolean(value);
+    };
+
+    let fileUrl = existing.fileUrl;
+    if (req.file) {
+      fileUrl = `/uploads/library/${req.file.filename}`;
+      const oldName = path.basename(existing.fileUrl);
+      await fs.unlink(path.join(uploadsRoot, oldName)).catch(() => undefined);
+    }
+
     const resource = await prisma.libraryResource.update({
       where: { id },
       data: {
@@ -215,23 +231,19 @@ export const updateResource = async (
           req.body.description !== undefined
             ? req.body.description?.trim() || null
             : existing.description,
-        isFree:
-          req.body.isFree !== undefined
-            ? Boolean(req.body.isFree)
-            : existing.isFree,
+        fileUrl,
+        isFree: parseBool(req.body.isFree, existing.isFree),
         sortOrder:
           req.body.sortOrder !== undefined
             ? Number(req.body.sortOrder)
             : existing.sortOrder,
-        isActive:
-          req.body.isActive !== undefined
-            ? Boolean(req.body.isActive)
-            : existing.isActive
+        isActive: parseBool(req.body.isActive, existing.isActive)
       }
     });
 
     res.json(sendSuccess({ resource }, "Resource updated"));
   } catch (error) {
+    if (req.file) await fs.unlink(req.file.path).catch(() => undefined);
     next(error);
   }
 };

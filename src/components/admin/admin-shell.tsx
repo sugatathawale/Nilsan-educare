@@ -14,7 +14,9 @@ import {
   Users
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { fetchAdminSession, logoutAdmin } from "@/lib/admin-auth";
 import type { AdminUser } from "@/lib/admin-types";
 import { cx } from "@/lib/utils";
@@ -33,6 +35,7 @@ const adminLinks = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isLoginPage = pathname === "/admin/login";
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<AdminUser | null>(null);
@@ -66,13 +69,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   async function handleLogout() {
     await logoutAdmin();
     setUser(null);
+    queryClient.clear();
     router.replace("/admin/login");
   }
 
   if (!ready) {
     return (
       <div className="admin-loading">
-        <p>Loading admin panel...</p>
+        <LoadingSpinner label="Loading admin panel…" size="lg" />
       </div>
     );
   }

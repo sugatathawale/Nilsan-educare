@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { AdminStatus } from "@/components/admin/admin-status";
-import { apiRequest, formatDateTime } from "@/lib/api";
-import type { EnrollmentRow, EnrollmentStatus } from "@/lib/admin-types";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatDateTime } from "@/lib/api";
+import { adminKeys, fetchAdminEnrollments } from "@/lib/admin-queries";
+import type { EnrollmentStatus } from "@/lib/admin-types";
 
 const STATUS_FILTERS: Array<"ALL" | EnrollmentStatus> = [
   "ALL",
@@ -15,37 +18,19 @@ const STATUS_FILTERS: Array<"ALL" | EnrollmentStatus> = [
 ];
 
 export default function AdminEnrollmentsPage() {
-  const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"ALL" | EnrollmentStatus>("ALL");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
+  const enrollmentsQuery = useQuery({
+    queryKey: adminKeys.enrollments,
+    queryFn: fetchAdminEnrollments
+  });
 
-    async function load() {
-      try {
-        const data = await apiRequest<{ enrollments: EnrollmentRow[] }>(
-          "/enrollments"
-        );
-        if (active) setEnrollments(data.enrollments);
-      } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load enrollments"
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const enrollments = enrollmentsQuery.data || [];
+  const error =
+    enrollmentsQuery.error instanceof Error
+      ? enrollmentsQuery.error.message
+      : "";
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -99,14 +84,16 @@ export default function AdminEnrollmentsPage() {
         </span>
       </div>
 
-      {loading ? <p className="admin-state">Loading enrollments...</p> : null}
+      {enrollmentsQuery.isLoading && !enrollmentsQuery.data ? (
+        <LoadingSpinner label="Loading enrollments…" size="lg" />
+      ) : null}
       {error ? <p className="admin-state admin-state--error">{error}</p> : null}
 
-      {!loading && !error && filtered.length === 0 ? (
+      {!enrollmentsQuery.isLoading && !error && filtered.length === 0 ? (
         <p className="admin-empty">No enrollments match your filters.</p>
       ) : null}
 
-      {!loading && !error && filtered.length > 0 ? (
+      {!enrollmentsQuery.isLoading && !error && filtered.length > 0 ? (
         <div className="admin-table admin-table--enrollments" role="table">
           <div className="admin-table__head" role="row">
             <span>Student</span>
