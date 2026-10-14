@@ -67,13 +67,37 @@ export function isYouTubeEmbedUrl(url: string | null | undefined): boolean {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
     return (
-      (YOUTUBE_HOSTS.has(host) ||
-        host === "youtube-nocookie.com" ||
-        host === "www.youtube-nocookie.com") &&
-      parsed.pathname.includes("/embed/")
+      YOUTUBE_HOSTS.has(host) ||
+      host === "youtube-nocookie.com" ||
+      host === "www.youtube-nocookie.com"
     );
   } catch {
     return false;
+  }
+}
+
+export function getYouTubeVideoId(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = new URL(raw.trim());
+    const host = parsed.hostname.toLowerCase();
+    if (
+      !YOUTUBE_HOSTS.has(host) &&
+      host !== "youtube-nocookie.com" &&
+      host !== "www.youtube-nocookie.com"
+    ) {
+      return null;
+    }
+
+    const fromQuery = parsed.searchParams.get("v");
+    const id =
+      (fromQuery && fromQuery.slice(0, 11)) ||
+      youtubeIdFromPath(parsed.pathname);
+
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
   }
 }
 
@@ -87,6 +111,7 @@ export function toPlaybackEmbedUrl(raw: string | null | undefined): string | nul
     // Standard youtube.com embeds are more reliable on iOS/Android WebViews
     // than youtube-nocookie for tap-to-play.
     parsed.hostname = "www.youtube.com";
+    parsed.searchParams.set("controls", "1");
     parsed.searchParams.set("modestbranding", "1");
     parsed.searchParams.set("rel", "0");
     parsed.searchParams.set("iv_load_policy", "3");
