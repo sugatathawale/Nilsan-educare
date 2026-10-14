@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -13,8 +14,12 @@ import {
 } from "lucide-react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
 import { LessonPlayer } from "@/components/courses/lesson-player";
-import { apiRequest, mediaUrl, ApiRequestError } from "@/lib/api";
-import type { CourseSummary, LessonItem } from "@/lib/admin-types";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { mediaUrl } from "@/lib/api";
+import {
+  fetchCoursePlayerBundle,
+  learnKeys
+} from "@/lib/learn-queries";
 
 function CoursePlayerInner() {
   const params = useParams<{ slug: string }>();
@@ -24,12 +29,9 @@ function CoursePlayerInner() {
 
   const slug = params.slug;
   const lessonFromQuery = searchParams.get("lesson");
-
-  const [lessons, setLessons] = useState<LessonItem[]>([]);
-  const [courseTitle, setCourseTitle] = useState("");
-  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(
+    lessonFromQuery
+  );
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -37,49 +39,27 @@ function CoursePlayerInner() {
     }
   }, [authLoading, user, router, slug]);
 
+  const playerQuery = useQuery({
+    queryKey: learnKeys.player(slug),
+    queryFn: () => fetchCoursePlayerBundle(slug),
+    enabled: Boolean(user && slug)
+  });
+
+  const lessons = playerQuery.data?.lessons || [];
+  const courseTitle = playerQuery.data?.courseTitle || slug;
+
   useEffect(() => {
-    if (!user || !slug) return;
+    if (!lessons.length) return;
 
-    let active = true;
+    const preferred =
+      lessons.find((lesson) => lesson.id === lessonFromQuery) ||
+      lessons.find((lesson) => lesson.id === activeLessonId) ||
+      lessons[0];
 
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const [lessonsData, courseData] = await Promise.all([
-          apiRequest<{ lessons: LessonItem[] }>(`/lessons/course/${slug}`),
-          apiRequest<{ course: CourseSummary }>(`/courses/${slug}`).catch(
-            () => null
-          )
-        ]);
-        if (!active) return;
-
-        setLessons(lessonsData.lessons);
-        setCourseTitle(courseData?.course.title || slug);
-
-        const preferred =
-          lessonsData.lessons.find((lesson) => lesson.id === lessonFromQuery) ||
-          lessonsData.lessons[0] ||
-          null;
-        setActiveLessonId(preferred?.id ?? null);
-      } catch (err) {
-        if (!active) return;
-        const message =
-          err instanceof ApiRequestError || err instanceof Error
-            ? err.message
-            : "Failed to load lessons";
-        setError(message);
-        setLessons([]);
-      } finally {
-        if (active) setLoading(false);
-      }
+    if (preferred && preferred.id !== activeLessonId) {
+      setActiveLessonId(preferred.id);
     }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [user, slug, lessonFromQuery]);
+  }, [lessons, lessonFromQuery, activeLessonId]);
 
   const activeLesson = useMemo(
     () => lessons.find((lesson) => lesson.id === activeLessonId) || null,
@@ -94,6 +74,8 @@ function CoursePlayerInner() {
   const embedUrl = activeLesson?.embedUrl || activeLesson?.videoUrl || null;
   const hasVideo = Boolean(embedUrl);
   const notes = activeLesson?.notes || [];
+  const showInitialLoader = playerQuery.isLoading && !playerQuery.data;
+  const showSoftRefresh = playerQuery.isFetching && Boolean(playerQuery.data);
 
   function selectLesson(lessonId: string) {
     setActiveLessonId(lessonId);
@@ -105,12 +87,12 @@ function CoursePlayerInner() {
   if (authLoading || !user) {
     return (
       <div className="learn-shell">
-        <p className="admin-state">Loading your account...</p>
+        <LoadingSpinner label="Loading your account…" size="lg" />
       </div>
     );
   }
 
-  if (loading) {
+  if (showInitialLoader) {
     return (
       <div className="learn-shell course-player">
         <header className="course-player__topbar">
@@ -118,19 +100,18 @@ function CoursePlayerInner() {
             <ArrowLeft size={16} />
             My Learning
           </Link>
-          <h1>{courseTitle || "Loading course…"}</h1>
+          <h1>Loading course…</h1>
           <p>Fetching your lectures</p>
         </header>
-        <div className="course-player__skeleton" aria-hidden>
-          <div className="course-player__skeleton-stage" />
-          <div className="course-player__skeleton-side" />
+        <div className="course-player__loading-panel">
+          <LoadingSpinner label="Loading lectures…" size="lg" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="learn-shell course-player">
+    <div className="learn-shell course-player learn-fade-in">
       <header className="course-player__topbar">
         <div>
           <Link className="course-player__back" href="/my-learning">
@@ -143,13 +124,21 @@ function CoursePlayerInner() {
             {activeIndex >= 0
               ? ` · Now playing ${activeIndex + 1} of ${lessons.length}`
               : ""}
+            {showSoftRefresh ? " · Updating…" : ""}
           </p>
         </div>
+        {showSoftRefresh ? <LoadingSpinner label="" size="sm" /> : null}
       </header>
 
-      {error ? <p className="admin-state admin-state--error">{error}</p> : null}
+      {playerQuery.isError ? (
+        <p className="admin-state admin-state--error">
+          {playerQuery.error instanceof Error
+            ? playerQuery.error.message
+            : "Failed to load lessons"}
+        </p>
+      ) : null}
 
-      {!error && lessons.length === 0 ? (
+      {!playerQuery.isError && lessons.length === 0 ? (
         <div className="learn-empty">
           <PlayCircle size={32} />
           <h3>No lessons yet</h3>
@@ -157,11 +146,14 @@ function CoursePlayerInner() {
         </div>
       ) : null}
 
-      {!error && lessons.length > 0 ? (
+      {!playerQuery.isError && lessons.length > 0 ? (
         <div className="course-player__layout">
           <section className="course-player__main">
             {activeLesson ? (
-              <>
+              <div
+                className="course-player__lesson-pane learn-fade-in"
+                key={activeLesson.id}
+              >
                 <div className="course-player__stage">
                   {hasVideo ? (
                     <LessonPlayer
@@ -214,7 +206,7 @@ function CoursePlayerInner() {
                           >
                             <FileText size={16} />
                             <span>{note.title}</span>
-                            <ChevronLabel />
+                            <span className="course-player__note-open">Open</span>
                           </a>
                         </li>
                       ))}
@@ -225,7 +217,7 @@ function CoursePlayerInner() {
                     </p>
                   )}
                 </div>
-              </>
+              </div>
             ) : null}
           </section>
 
@@ -258,7 +250,11 @@ function CoursePlayerInner() {
                             : "course-player__index"
                         }
                       >
-                        {isActive ? <Play size={12} fill="currentColor" /> : lesson.order}
+                        {isActive ? (
+                          <Play size={12} fill="currentColor" />
+                        ) : (
+                          lesson.order
+                        )}
                       </span>
                       <span className="course-player__item-copy">
                         <strong>{lesson.title}</strong>
@@ -279,16 +275,12 @@ function CoursePlayerInner() {
   );
 }
 
-function ChevronLabel() {
-  return <span className="course-player__note-open">Open</span>;
-}
-
 export default function CoursePlayerPage() {
   return (
     <Suspense
       fallback={
         <div className="learn-shell">
-          <p className="admin-state">Loading player...</p>
+          <LoadingSpinner label="Loading player…" size="lg" />
         </div>
       }
     >

@@ -3990,6 +3990,79 @@ a.admin-primary-action {
   padding: 28px 0 72px;
 }
 
+.learn-loading {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 12px;
+  min-height: 160px;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+
+.learn-loading--sm {
+  min-height: 0;
+  gap: 0;
+}
+
+.learn-loading--lg {
+  min-height: 240px;
+}
+
+.learn-loading__icon {
+  animation: learn-spin 0.8s linear infinite;
+  color: var(--primary);
+}
+
+.learn-fade-in {
+  animation: learn-fade-in 0.28s ease;
+}
+
+.course-player__loading-panel {
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.course-player__lesson-pane {
+  display: grid;
+  gap: 16px;
+}
+
+.course-player__topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.learn-section__head-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@keyframes learn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes learn-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .learn-kicker {
   margin: 0 0 6px;
   color: var(--primary);

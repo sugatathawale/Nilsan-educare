@@ -1,19 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, ChevronRight, LogOut, Play } from "lucide-react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
-import { apiRequest, formatDate } from "@/lib/api";
-import type { MyEnrollment } from "@/lib/auth-types";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatDate } from "@/lib/api";
+import {
+  fetchCoursePlayerBundle,
+  fetchMyEnrollments,
+  learnKeys
+} from "@/lib/learn-queries";
 
 export default function MyLearningPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, loading, logout } = useStudentAuth();
-  const [enrollments, setEnrollments] = useState<MyEnrollment[]>([]);
-  const [error, setError] = useState("");
-  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -21,51 +25,42 @@ export default function MyLearningPage() {
     }
   }, [loading, user, router]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    let active = true;
-
-    async function load() {
-      try {
-        const data = await apiRequest<{ enrollments: MyEnrollment[] }>(
-          "/enrollments/my"
-        );
-        if (active) setEnrollments(data.enrollments);
-      } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load enrollments"
-          );
-        }
-      } finally {
-        if (active) setFetching(false);
-      }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [user]);
+  const enrollmentsQuery = useQuery({
+    queryKey: learnKeys.enrollments,
+    queryFn: fetchMyEnrollments,
+    enabled: Boolean(user)
+  });
 
   async function handleLogout() {
     await logout();
+    queryClient.clear();
     router.replace("/login");
+  }
+
+  function prefetchCourse(slug: string) {
+    void queryClient.prefetchQuery({
+      queryKey: learnKeys.player(slug),
+      queryFn: () => fetchCoursePlayerBundle(slug)
+    });
   }
 
   if (loading || !user) {
     return (
       <div className="learn-shell">
-        <p className="admin-state">Loading your account...</p>
+        <LoadingSpinner label="Loading your account…" size="lg" />
       </div>
     );
   }
 
   const firstName = user.fullName.split(" ")[0];
+  const enrollments = enrollmentsQuery.data || [];
+  const showInitialLoader =
+    enrollmentsQuery.isLoading && !enrollmentsQuery.data;
+  const showSoftRefresh =
+    enrollmentsQuery.isFetching && Boolean(enrollmentsQuery.data);
 
   return (
-    <div className="learn-shell my-learning">
+    <div className="learn-shell my-learning learn-fade-in">
       <header className="learn-hero">
         <div className="learn-hero__copy">
           <p className="learn-kicker">My Learning</p>
@@ -95,18 +90,32 @@ export default function MyLearningPage() {
             <p className="learn-kicker">Enrolled</p>
             <h2>Your courses</h2>
           </div>
-          {enrollments.length > 0 ? (
-            <span className="learn-count-pill">
-              {enrollments.length}{" "}
-              {enrollments.length === 1 ? "course" : "courses"}
-            </span>
-          ) : null}
+          <div className="learn-section__head-meta">
+            {showSoftRefresh ? <LoadingSpinner label="" size="sm" /> : null}
+            {enrollments.length > 0 ? (
+              <span className="learn-count-pill">
+                {enrollments.length}{" "}
+                {enrollments.length === 1 ? "course" : "courses"}
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        {fetching ? <p className="admin-state">Loading courses...</p> : null}
-        {error ? <p className="admin-state admin-state--error">{error}</p> : null}
+        {showInitialLoader ? (
+          <LoadingSpinner label="Loading your courses…" size="lg" />
+        ) : null}
 
-        {!fetching && !error && enrollments.length === 0 ? (
+        {enrollmentsQuery.isError ? (
+          <p className="admin-state admin-state--error">
+            {enrollmentsQuery.error instanceof Error
+              ? enrollmentsQuery.error.message
+              : "Failed to load enrollments"}
+          </p>
+        ) : null}
+
+        {!showInitialLoader &&
+        !enrollmentsQuery.isError &&
+        enrollments.length === 0 ? (
           <div className="learn-empty">
             <BookOpen size={32} />
             <h3>No courses yet</h3>
@@ -148,6 +157,10 @@ export default function MyLearningPage() {
                       <Link
                         className="learn-btn learn-btn--primary learn-btn--icon"
                         href={continueHref}
+                        onFocus={() => prefetchCourse(enrollment.course.slug)}
+                        onMouseEnter={() =>
+                          prefetchCourse(enrollment.course.slug)
+                        }
                       >
                         <Play size={16} fill="currentColor" />
                         Watch lectures
@@ -159,6 +172,12 @@ export default function MyLearningPage() {
                         <li key={lesson.id}>
                           <Link
                             href={`/my-learning/${enrollment.course.slug}?lesson=${lesson.id}`}
+                            onFocus={() =>
+                              prefetchCourse(enrollment.course.slug)
+                            }
+                            onMouseEnter={() =>
+                              prefetchCourse(enrollment.course.slug)
+                            }
                           >
                             <span className="learn-lesson-preview__index">
                               {lesson.order}
