@@ -33,7 +33,7 @@ const adminLinks = [
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const queryClient = useQueryClient();
   const isLoginPage = pathname === "/admin/login";

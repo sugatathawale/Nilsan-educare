@@ -109,7 +109,7 @@ function AudiobooksPageInner() {
 
   useEffect(() => {
     if (authLoading || !user || autoStarted.current) return;
-    if (searchParams.get("checkout") !== "library") return;
+    if (searchParams?.get("checkout") !== "library") return;
     if (data?.subscribed) {
       clearCheckoutIntent();
       return;

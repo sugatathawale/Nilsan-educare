@@ -27,8 +27,8 @@ function CoursePlayerInner() {
   const router = useRouter();
   const { user, loading: authLoading } = useStudentAuth();
 
-  const slug = params.slug;
-  const lessonFromQuery = searchParams.get("lesson");
+  const slug = params?.slug ?? "";
+  const lessonFromQuery = searchParams?.get("lesson") ?? null;
   const [activeLessonId, setActiveLessonId] = useState<string | null>(
     lessonFromQuery
   );

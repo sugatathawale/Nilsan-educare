@@ -16,7 +16,7 @@ import { toEmbedVideoUrl, videoProviderLabel } from "@/lib/video-url";
 
 export default function AdminLessonsClient() {
   const searchParams = useSearchParams();
-  const presetCourse = searchParams.get("course") || "";
+  const presetCourse = searchParams?.get("course") || "";
   const queryClient = useQueryClient();
 
   const [courseSlug, setCourseSlug] = useState(presetCourse);

@@ -25,7 +25,7 @@ import {
 
 function CourseDetailsInner() {
   const params = useParams<{ slug: string }>();
-  const slug = params.slug;
+  const slug = params?.slug ?? "";
   const [course, setCourse] = useState<CoursePageHero | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);

@@ -92,7 +92,7 @@ export function EnrollButton({
 
   useEffect(() => {
     if (loading || !user || autoStarted.current) return;
-    if (searchParams.get("checkout") !== "1") return;
+    if (searchParams?.get("checkout") !== "1") return;
     autoStarted.current = true;
     void startCheckout();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once after auth return

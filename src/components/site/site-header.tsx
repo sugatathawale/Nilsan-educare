@@ -12,7 +12,7 @@ import { cx } from "@/lib/utils";
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const { user, loading, logout } = useStudentAuth();
   const mainLinks = navLinks.filter((link) => link.label !== "Admin Panel");

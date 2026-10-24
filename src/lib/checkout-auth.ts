@@ -64,7 +64,11 @@ export function requireAuthForCheckout(options: {
 }
 
 export function resolveAuthNext(
-  searchParams: URLSearchParams | { get: (key: string) => string | null }
+  searchParams:
+    | URLSearchParams
+    | { get: (key: string) => string | null }
+    | null
+    | undefined
 ) {
-  return safePath(searchParams.get("next"), "/my-learning");
+  return safePath(searchParams?.get("next") ?? null, "/my-learning");
 }
