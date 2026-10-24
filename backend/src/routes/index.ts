@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 import { Router } from "express";
 import { authRouter } from "../modules/auth/auth.routes.js";
 import { usersRouter } from "../modules/users/users.routes.js";
@@ -11,7 +12,7 @@ import { libraryRouter } from "../modules/library/library.routes.js";
 
 export const apiRouter = Router();
 
-apiRouter.get("/health", (_req, res) => {
+apiRouter.get("/health", (_req: Request, res: Response) => {
   res.json({
     success: true,
     message: "Nilsan Educare API is running",
