@@ -3,12 +3,13 @@ import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
 import type { GalleryCategory } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
+import { uploadsRoot as resolveUploads } from "../../lib/uploads-path.js";
 import { AppError } from "../../middleware/error.middleware.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { getParam } from "../../utils/request.js";
 import { galleryCategorySchema } from "./gallery.validator.js";
 
-const uploadsRoot = path.resolve(process.cwd(), "uploads", "gallery");
+const uploadsRoot = resolveUploads("gallery");
 
 export const listGallery = async (
   req: Request,

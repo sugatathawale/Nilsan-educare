@@ -14,8 +14,9 @@ import { toEmbedVideoUrl } from "../../lib/video-url.js";
 import { AppError } from "../../middleware/error.middleware.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { getParam } from "../../utils/request.js";
+import { uploadsRoot } from "../../lib/uploads-path.js";
 
-const notesUploadsRoot = path.resolve(process.cwd(), "uploads", "notes");
+const notesUploadsRoot = uploadsRoot("notes");
 
 const withPlayback = <
   T extends {

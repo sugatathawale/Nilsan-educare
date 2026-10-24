@@ -1,4 +1,10 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm install --prefix backend && npm run db:generate --prefix backend && npm run build --prefix backend && npm run build",
+  "functions": {
+    "src/pages/api/v1/[[...path]].ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
 }

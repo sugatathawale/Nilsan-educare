@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Headphones, PlayCircle, Sparkles } from "lucide-react";
+import { BookOpen, FileText, PlayCircle, Sparkles } from "lucide-react";
 import { useStudentAuth } from "@/components/auth/student-auth-provider";
 
 const links = [
   { href: "/dashboard#courses", label: "Courses", icon: BookOpen },
   { href: "/playlists", label: "Playlists", icon: PlayCircle },
-  { href: "/library/audiobooks", label: "Library", icon: Headphones },
+  { href: "/study-materials", label: "Materials", icon: FileText },
   { href: "/my-learning", label: "Learning", icon: Sparkles, auth: true }
 ];
 

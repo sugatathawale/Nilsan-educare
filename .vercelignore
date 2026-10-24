@@ -1,1 +1,5 @@
-backend/
+backend/node_modules
+backend/uploads
+backend/dist
+README.txt
+nelsonimg.jpeg

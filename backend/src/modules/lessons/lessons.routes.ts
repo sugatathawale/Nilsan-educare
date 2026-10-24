@@ -1,10 +1,9 @@
-import fs from "node:fs";
-import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import { authenticate } from "../../middleware/auth.middleware.js";
 import { requireAdmin } from "../../middleware/role.middleware.js";
 import { validateBody } from "../../middleware/validate.middleware.js";
+import { uploadsRoot } from "../../lib/uploads-path.js";
 import * as lessonsController from "./lessons.controller.js";
 import {
   createBunnyVideoSchema,
@@ -29,8 +28,7 @@ const videoUpload = multer({
   }
 });
 
-const notesDir = path.resolve(process.cwd(), "uploads", "notes");
-fs.mkdirSync(notesDir, { recursive: true });
+const notesDir = uploadsRoot("notes");
 
 const notesUpload = multer({
   storage: multer.diskStorage({

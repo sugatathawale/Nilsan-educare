@@ -9,9 +9,9 @@ const start = async () => {
     await prisma.$connect();
     console.log("Database connected");
 
-    app.listen(env.PORT, () => {
-      console.log(`Server running on http://localhost:${env.PORT}`);
-      console.log(`API base URL: http://localhost:${env.PORT}${env.API_PREFIX}`);
+    app.listen(env.PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${env.PORT}`);
+      console.log(`API base URL: http://0.0.0.0:${env.PORT}${env.API_PREFIX}`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);

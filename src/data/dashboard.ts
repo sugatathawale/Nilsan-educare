@@ -8,9 +8,7 @@ export const navLinks = [
   { label: "Our Courses", href: "/dashboard#courses" },
   { label: "Playlist", href: "/playlists" },
   { label: "Audiobooks", href: "/audiobooks" },
-  { label: "Gallery", href: "/gallery" },
-  { label: "About", href: "/about" },
-  { label: "Contact", href: "/contact" },
+  { label: "Study Materials", href: "/study-materials" },
   { label: "Admin Panel", href: "/admin" }
 ];
 

@@ -3,31 +3,31 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, Star } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Download,
+  FileQuestion,
+  FileText,
+  Star
+} from "lucide-react";
 import { apiRequest, mediaUrl } from "@/lib/api";
-import type { GalleryImage } from "@/lib/gallery";
+import { materialSectionLabel, type LibraryPayload, type LibraryResource } from "@/lib/library";
+import { MOCK_STUDY_MATERIALS } from "@/lib/study-materials-mock";
 import { teacherProfile, testimonials } from "@/data/dashboard";
 
-const FALLBACK_GALLERY = [
-  { src: "/result/result-1.jpeg", alt: "Students in classroom" },
-  { src: "/result/result-2.jpeg", alt: "Learning session results" },
-  { src: "/result/result-3.jpeg", alt: "Classroom moments" },
-  { src: "/images/demo-student.png", alt: "Student learning English" },
-  { src: "/images/teacher-1.png", alt: "Live training session" },
-  { src: "/images/teacher-2.png", alt: "Speaking practice class" }
-];
-
-function isUsableGalleryImage(item: GalleryImage) {
-  const url = (item.imageUrl || "").toLowerCase();
-  const title = (item.title || "").toLowerCase();
-  if (!url) return false;
-  if (url.includes("logo") || url.includes("nilsanlogo")) return false;
-  if (title.includes("logo")) return false;
-  return true;
-}
+const sectionIcon = {
+  NOTES: FileText,
+  BOOKS: BookOpen,
+  WORKSHEETS: FileText,
+  PRACTICE: FileText,
+  PYQS: FileQuestion
+} as const;
 
 export function HomeStorySection() {
-  const [gallery, setGallery] = useState<GalleryImage[]>([]);
+  const [materials, setMaterials] = useState<LibraryResource[]>(
+    MOCK_STUDY_MATERIALS
+  );
   const reviews = testimonials.slice(0, 3);
 
   useEffect(() => {
@@ -35,12 +35,14 @@ export function HomeStorySection() {
 
     async function load() {
       try {
-        const data = await apiRequest<{ images: GalleryImage[] }>("/gallery");
-        if (alive) {
-          setGallery(data.images.filter(isUsableGalleryImage).slice(0, 6));
-        }
+        const data = await apiRequest<LibraryPayload>("/library?type=NOTE");
+        if (!alive) return;
+        const notes = data.resources
+          .filter((item) => item.type === "NOTE" && !item.locked)
+          .slice(0, 3);
+        setMaterials(notes.length > 0 ? notes : MOCK_STUDY_MATERIALS);
       } catch {
-        // Fall back to local result images below
+        if (alive) setMaterials(MOCK_STUDY_MATERIALS);
       }
     }
 
@@ -50,17 +52,7 @@ export function HomeStorySection() {
     };
   }, []);
 
-  const previewImages =
-    gallery.length >= 3
-      ? gallery.map((item) => ({
-          src: mediaUrl(item.imageUrl),
-          alt: item.title || "Gallery photo",
-          remote: true
-        }))
-      : FALLBACK_GALLERY.map((item) => ({
-          ...item,
-          remote: false
-        }));
+  const preview = materials.slice(0, 3);
 
   return (
     <section className="home-story" id="about">
@@ -126,36 +118,44 @@ export function HomeStorySection() {
         </div>
       </div>
 
-      <div className="home-story__band home-story__band--gallery">
+      <div className="home-story__band home-story__band--materials">
         <div className="site-container">
           <div className="home-story__reviews-head">
             <div>
-              <p className="section-eyebrow">Gallery</p>
-              <h3>Moments from class & results</h3>
+              <p className="section-eyebrow">Study Materials</p>
+              <h3>Free books, PDFs &amp; PYQs</h3>
               <p className="home-story__lead">
-                Classroom energy, practice sessions, and student milestones.
+                Download speaking handbooks, revision PDFs, and previous year
+                questions — all in one place.
               </p>
             </div>
-            <Link className="home-story__link" href="/gallery">
-              View gallery
+            <Link className="home-story__link" href="/study-materials">
+              View all
               <ArrowRight size={16} />
             </Link>
           </div>
-          <div className="home-story__photo-grid">
-            {previewImages.slice(0, 6).map((photo, index) => (
-              <div
-                className={`home-story__photo ${index === 0 ? "is-wide" : ""}`}
-                key={`${photo.src}-${index}`}
-              >
-                <Image
-                  alt={photo.alt}
-                  fill
-                  sizes="(max-width: 720px) 50vw, 220px"
-                  src={photo.src}
-                  unoptimized={photo.remote}
-                />
-              </div>
-            ))}
+
+          <div className="home-materials-grid">
+            {preview.map((item) => {
+              const Icon = sectionIcon[item.section] || FileText;
+              const href = item.fileUrl ? mediaUrl(item.fileUrl) : "/study-materials";
+              return (
+                <article className="home-material-card" key={item.id}>
+                  <div className="home-material-card__icon" aria-hidden>
+                    <Icon size={20} />
+                  </div>
+                  <div className="home-material-card__body">
+                    <span>{materialSectionLabel(item.section)}</span>
+                    <strong>{item.title}</strong>
+                    {item.description ? <p>{item.description}</p> : null}
+                  </div>
+                  <a className="home-material-card__action" href={href}>
+                    <Download size={15} />
+                    {item.fileUrl ? "Download" : "Open"}
+                  </a>
+                </article>
+              );
+            })}
           </div>
         </div>
       </div>

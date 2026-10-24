@@ -3,15 +3,31 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
 import type { ResourceType } from "@prisma/client";
+
+const MATERIAL_SECTIONS = new Set([
+  "NOTES",
+  "BOOKS",
+  "WORKSHEETS",
+  "PRACTICE",
+  "PYQS"
+]);
+
+function parseSection(value: unknown, fallback = "NOTES") {
+  const section = String(value || "")
+    .trim()
+    .toUpperCase();
+  return MATERIAL_SECTIONS.has(section) ? section : fallback;
+}
 import { env, isRazorpayConfigured } from "../../config/env.js";
 import { PAYMENT } from "../../config/constants.js";
 import { getRazorpay } from "../../lib/razorpay.js";
 import { prisma } from "../../lib/prisma.js";
+import { uploadsRoot as resolveUploads } from "../../lib/uploads-path.js";
 import { AppError } from "../../middleware/error.middleware.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { getParam } from "../../utils/request.js";
 
-const uploadsRoot = path.resolve(process.cwd(), "uploads", "library");
+const uploadsRoot = resolveUploads("library");
 
 const ensurePlan = async () => {
   return prisma.libraryPlan.upsert({
@@ -134,6 +150,7 @@ export const listResources = async (
       return {
         id: item.id,
         type: item.type,
+        section: item.section,
         title: item.title,
         description: item.description,
         coverUrl: item.coverUrl,
@@ -181,6 +198,7 @@ export const createResource = async (
     const resource = await prisma.libraryResource.create({
       data: {
         type: type as ResourceType,
+        section: parseSection(req.body.section),
         title,
         description: req.body.description?.trim() || null,
         fileUrl: `/uploads/library/${file.filename}`,
@@ -227,6 +245,10 @@ export const updateResource = async (
       where: { id },
       data: {
         title: req.body.title?.trim() || existing.title,
+        section:
+          req.body.section !== undefined
+            ? parseSection(req.body.section, existing.section)
+            : existing.section,
         description:
           req.body.description !== undefined
             ? req.body.description?.trim() || null

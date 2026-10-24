@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import {
@@ -7,10 +5,10 @@ import {
   optionalAuthenticate
 } from "../../middleware/auth.middleware.js";
 import { requireAdmin } from "../../middleware/role.middleware.js";
+import { uploadsRoot } from "../../lib/uploads-path.js";
 import * as libraryController from "./library.controller.js";
 
-const uploadsDir = path.resolve(process.cwd(), "uploads", "library");
-fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadsDir = uploadsRoot("library");
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),

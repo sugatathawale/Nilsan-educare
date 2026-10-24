@@ -1,10 +1,10 @@
-import path from "node:path";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import { corsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
+import { uploadsBase } from "./lib/uploads-path.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { apiRouter } from "./routes/index.js";
 
@@ -24,7 +24,7 @@ export const createApp = () => {
 
   app.use(
     "/uploads",
-    express.static(path.resolve(process.cwd(), "uploads"), {
+    express.static(uploadsBase(), {
       maxAge: "7d",
       fallthrough: true
     })

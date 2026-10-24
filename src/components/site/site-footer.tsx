@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
-import { contact, galleryNavLinks, navLinks } from "@/data/dashboard";
+import { contact, navLinks } from "@/data/dashboard";
 import { BrandLogo } from "@/components/ui/brand-logo";
 
 export function SiteFooter() {
@@ -41,22 +41,17 @@ export function SiteFooter() {
         </div>
 
         <div className="site-footer__col">
-          <h3>Gallery</h3>
-          <nav aria-label="Footer gallery links">
-            <Link href="/gallery">All photos</Link>
-            {galleryNavLinks.map((link) => (
-              <Link href={link.href} key={link.href}>
-                {link.label}
-              </Link>
-            ))}
+          <h3>Resources</h3>
+          <nav aria-label="Footer resource links">
+            <Link href="/study-materials">Study Materials</Link>
+            <Link href="/audiobooks">Audiobooks</Link>
+            <Link href="/playlists">Playlist</Link>
           </nav>
         </div>
 
         <div className="site-footer__col">
           <h3>Student</h3>
           <nav aria-label="Footer student links">
-            <Link href="/playlists">Playlist</Link>
-            <Link href="/audiobooks">Audiobooks</Link>
             <Link href="/login">Log in</Link>
             <Link href="/signup">Sign up</Link>
             <Link href="/my-learning">My Learning</Link>

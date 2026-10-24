@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "../../lib/prisma.js";
+import { uploadsRoot as resolveUploads } from "../../lib/uploads-path.js";
 import { AppError } from "../../middleware/error.middleware.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { getParam } from "../../utils/request.js";
@@ -10,7 +11,7 @@ import {
   updateCourseSchema
 } from "./courses.validator.js";
 
-const uploadsRoot = path.resolve(process.cwd(), "uploads", "courses");
+const uploadsRoot = resolveUploads("courses");
 
 function parseBody(req: Request) {
   return {

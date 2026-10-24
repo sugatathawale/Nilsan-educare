@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -176,6 +177,7 @@ model LibraryPlan {
 model LibraryResource {
   id          String       @id @default(cuid())
   type        ResourceType
+  section     String       @default("NOTES")
   title       String
   description String?
   fileUrl     String
@@ -187,6 +189,7 @@ model LibraryResource {
   updatedAt   DateTime     @updatedAt
 
   @@index([type, isActive, sortOrder])
+  @@index([section, isActive, sortOrder])
   @@map("library_resources")
 }
 

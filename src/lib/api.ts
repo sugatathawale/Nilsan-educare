@@ -1,18 +1,43 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:4000/api/v1";
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (configured) return configured;
 
-export const API_ORIGIN =
-  process.env.NEXT_PUBLIC_API_ORIGIN?.replace(/\/$/, "") ||
-  API_BASE.replace(/\/api\/v1\/?$/, "") ||
-  "http://localhost:4000";
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      return `${window.location.origin}/api/v1`;
+    }
+    return "http://localhost:4000/api/v1";
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api/v1`;
+  }
+
+  return "http://localhost:4000/api/v1";
+}
+
+function resolveApiOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_API_ORIGIN?.replace(/\/$/, "");
+  if (configured) return configured;
+
+  const base = resolveApiBase();
+  if (base.startsWith("/")) {
+    if (typeof window !== "undefined") return window.location.origin;
+    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+    return "http://localhost:3000";
+  }
+
+  return base.replace(/\/api\/v1\/?$/, "") || "http://localhost:4000";
+}
 
 export function mediaUrl(pathOrUrl: string | null | undefined): string {
   if (!pathOrUrl) return "";
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
     return pathOrUrl;
   }
-  return `${API_ORIGIN}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+  const origin = resolveApiOrigin();
+  return `${origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
 export type ApiSuccess<T> = {
@@ -49,8 +74,9 @@ export async function apiRequest<T>(
   options: RequestOptions = {}
 ): Promise<T> {
   const { method = "GET", body } = options;
+  const apiBase = resolveApiBase();
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${apiBase}${path}`, {
     method,
     credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -82,7 +108,8 @@ export async function apiUpload<T>(
   formData: FormData,
   method: "POST" | "PATCH" | "PUT" = "POST"
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const apiBase = resolveApiBase();
+  const response = await fetch(`${apiBase}${path}`, {
     method,
     credentials: "include",
     body: formData

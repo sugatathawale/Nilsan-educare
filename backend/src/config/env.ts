@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
 import { z } from "zod";
 
+// Local Express uses backend/.env; Vercel injects process.env directly
 dotenv.config();
+dotenv.config({ path: "backend/.env" });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
